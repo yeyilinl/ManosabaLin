@@ -271,7 +271,8 @@ internal static class AnanlinCardHelpers
         PlayerChoiceContext choiceContext,
         CardModel card,
         Creature? target = null,
-        bool skipCardPileVisuals = true)
+        bool skipCardPileVisuals = true,
+        bool removeFromCombatAfterPlay = true)
     {
         if (CombatManager.Instance.IsOverOrEnding || card.Owner.Creature.IsDead) return;
 
@@ -302,7 +303,7 @@ internal static class AnanlinCardHelpers
             },
             skipCardPileVisuals);
 
-        if (card.Pile?.IsCombatPile == true)
+        if (removeFromCombatAfterPlay && card.Pile?.IsCombatPile == true)
             await CardPileCmd.RemoveFromCombat(card, skipVisuals: true);
     }
 

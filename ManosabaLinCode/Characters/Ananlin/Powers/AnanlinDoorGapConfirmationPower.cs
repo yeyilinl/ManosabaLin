@@ -7,20 +7,16 @@ namespace ManosabaLin.Characters.Ananlin.Powers;
 public sealed class AnanlinDoorGapConfirmationPower : ManosabaPowerTemplate
 {
     private CardModel? _canonicalCard;
-    private int _upgradeLevel;
     private int _bonusBlock;
-    private int _attacksPlayedWhenArmed;
 
     public override PowerType Type => PowerType.Buff;
     public override PowerStackType StackType => PowerStackType.None;
     protected override bool IsVisibleInternal => false;
 
-    internal void Track(CardModel card, int bonusBlock, int attacksPlayedWhenArmed)
+    internal void Track(CardModel card, int bonusBlock)
     {
         _canonicalCard = card.CanonicalInstance;
-        _upgradeLevel = card.CurrentUpgradeLevel;
         _bonusBlock = bonusBlock;
-        _attacksPlayedWhenArmed = attacksPlayedWhenArmed;
         Amount = 1;
     }
 
@@ -28,15 +24,20 @@ public sealed class AnanlinDoorGapConfirmationPower : ManosabaPowerTemplate
     {
         if (player.Creature != Owner) return;
 
-        if (_canonicalCard is null || HasPlayedAttackSinceArmed(player))
+        if (_canonicalCard is null || !HasLostPeaceThisTurn(player))
         {
             await PowerCmd.Remove(this);
             return;
         }
 
-        var copy = CombatState.CreateCard(_canonicalCard, player);
-        for (var i = 0; i < _upgradeLevel; i++)
-            CardCmd.Upgrade(copy);
+        // 直接打出被记录的牌本身（不生成复制）
+        var handCard = PileType.Hand.GetPile(player).Cards
+            .FirstOrDefault(card => card.CanonicalInstance == _canonicalCard);
+        if (handCard is null)
+        {
+            await PowerCmd.Remove(this);
+            return;
+        }
 
         if (_bonusBlock > 0)
         {
@@ -45,12 +46,16 @@ public sealed class AnanlinDoorGapConfirmationPower : ManosabaPowerTemplate
                 Owner,
                 _bonusBlock,
                 Owner,
-                copy);
-            bonus?.Track(copy, _bonusBlock);
+                handCard);
+            bonus?.Track(handCard, _bonusBlock);
         }
 
         Flash();
-        await AnanlinCardHelpers.ResolveAsFreeCardEffect(choiceContext, copy, skipCardPileVisuals: false);
+        await AnanlinCardHelpers.ResolveAsFreeCardEffect(
+            choiceContext,
+            handCard,
+            skipCardPileVisuals: false,
+            removeFromCombatAfterPlay: false);
         await PowerCmd.Remove(this);
     }
 
@@ -63,9 +68,8 @@ public sealed class AnanlinDoorGapConfirmationPower : ManosabaPowerTemplate
             await PowerCmd.Remove(this);
     }
 
-    private bool HasPlayedAttackSinceArmed(Player player)
+    private bool HasLostPeaceThisTurn(Player player)
     {
-        var sketchbook = player.Relics.OfType<AnansSketchbook>().FirstOrDefault();
-        return sketchbook is not null && sketchbook.AttacksPlayedThisTurn > _attacksPlayedWhenArmed;
+        return player.Relics.OfType<AnansSketchbook>().FirstOrDefault()?.PeaceLostThisTurn == true;
     }
 }

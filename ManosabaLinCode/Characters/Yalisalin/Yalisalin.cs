@@ -1,4 +1,5 @@
 using Godot;
+using ManosabaLin.Characters.Hiro;
 using ManosabaLin.Extensions;
 using MegaCrit.Sts2.Core.Entities.Characters;
 using MegaCrit.Sts2.Core.Nodes.Combat;
@@ -35,6 +36,11 @@ public class Yalisalin : ManosabaCharacterTemplate<YalisalinCardPool, YalisalinR
             CharacterSelectBgPath: "yalisalin_bg.tscn".CharacterScenePath(CharacterId),
             CharacterSelectIconPath: "yalisalin_char_select.png".CharacterImgPath(CharacterId),
             MapMarkerPath: "yalisalin_map.png".CharacterImgPath(CharacterId)),
+        Multiplayer: new CharacterMultiplayerAssetSet(
+            "yalisalin_arm_pointing.png".CharacterImgPath(CharacterId),
+            "yalisalin_arm_rock.png".CharacterImgPath(CharacterId),
+            "yalisalin_arm_paper.png".CharacterImgPath(CharacterId),
+            "yalisalin_arm_scissors.png".CharacterImgPath(CharacterId)),
         Audio: new CharacterAudioAssetSet(
             CharacterSelectSfx: $"event:/{ModId}/sfx/characters/sherrylin/select"));
 

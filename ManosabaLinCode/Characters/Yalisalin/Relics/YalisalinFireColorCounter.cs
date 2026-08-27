@@ -29,6 +29,8 @@ public partial class YalisalinFireColorCounter : Control
     private YalisalinFireColor?[] _slotColors = [];
     private string _lastSignature = string.Empty;
     private int _hoveredSlotIndex = -1;
+    private TaskCompletionSource<int?>? _slotCompletion;
+    private readonly List<Button> _insertSlotButtons = [];
 
     public override void _Ready()
     {
@@ -53,6 +55,79 @@ public partial class YalisalinFireColorCounter : Control
         _viewer = viewer;
         _target = target;
         Refresh(force: true);
+    }
+
+    /// <summary>
+    /// 进入"选择插入位置"模式：玩家点击量表的格子间位置，返回 (目标, 插入位置)。
+    /// </summary>
+    public async Task<(Creature Target, int SlotIndex)?> PickInsertSlot(LocString prompt)
+    {
+        if (_viewer == null || _target == null)
+            return null;
+
+        _slotCompletion = new TaskCompletionSource<int?>();
+
+        var tip = new Label
+        {
+            Text = prompt.GetFormattedText(),
+            Position = new Vector2(-LeftPadding - 170f, -24f),
+            Size = new Vector2(220f, 20f),
+            ZIndex = 30,
+            Modulate = new Color(1f, 1f, 1f)
+        };
+        AddChild(tip);
+
+        BuildInsertSlotButtons();
+
+        var result = await _slotCompletion.Task;
+        ClearInsertSlotButtons();
+        tip.QueueFree();
+        return result is { } picked ? (_target, picked) : null;
+    }
+
+    /// <summary>取消正在进行的选格模式（清理按钮与提示）。</summary>
+    public void CancelPickInsertSlot()
+    {
+        _slotCompletion?.TrySetResult(null);
+    }
+
+    private void BuildInsertSlotButtons()
+    {
+        ClearInsertSlotButtons();
+
+        var count = GetVisibleSegments().Count;
+        for (var i = 0; i <= count; i++)
+        {
+            var captured = i;
+            var button = new Button
+            {
+                Name = $"InsertSlot{i}",
+                Text = "+",
+                Flat = true,
+                Position = new Vector2(0f, i * (SlotSize + SlotGap) - SlotSize / 2f),
+                Size = new Vector2(SlotSize, SlotSize),
+                MouseFilter = MouseFilterEnum.Stop,
+                ZIndex = 25,
+                FocusMode = FocusModeEnum.None,
+                Modulate = new Color(1f, 0.92f, 0.55f, 0.9f)
+            };
+            button.Pressed += () => OnInsertSlotChosen(captured);
+            AddChild(button);
+            _insertSlotButtons.Add(button);
+        }
+    }
+
+    private void ClearInsertSlotButtons()
+    {
+        foreach (var button in _insertSlotButtons)
+            button.QueueFree();
+
+        _insertSlotButtons.Clear();
+    }
+
+    private void OnInsertSlotChosen(int index)
+    {
+        _slotCompletion?.TrySetResult(index);
     }
 
     public override void _Process(double delta)

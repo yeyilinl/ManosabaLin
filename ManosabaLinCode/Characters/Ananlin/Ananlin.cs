@@ -1,4 +1,5 @@
 using Godot;
+using ManosabaLin.Characters.Hiro;
 using ManosabaLin.Extensions;
 using MegaCrit.Sts2.Core.Entities.Characters;
 using MegaCrit.Sts2.Core.Nodes.Combat;

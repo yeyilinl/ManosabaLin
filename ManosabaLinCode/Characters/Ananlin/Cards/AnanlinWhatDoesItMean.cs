@@ -26,10 +26,14 @@ public sealed class AnanlinWhatDoesItMean()
         if (target is null) return;
 
         var effect = Owner.RunState.Rng.CombatCardGeneration.NextItem(Enum.GetValues<RandomEffect>());
-        if (IsUpgraded && !await ShouldAccept(choiceContext, target, effect))
-            return;
 
-        await ApplyEffect(choiceContext, target, effect);
+        // 先发生效果
+        var undo = await ApplyEffect(choiceContext, target, effect);
+        if (!IsUpgraded) return;
+
+        // 升级后：效果已发生，再选择是否接受；拒绝则撤销
+        if (!await ShouldAccept(choiceContext, target, effect) && undo is not null)
+            await undo(choiceContext);
     }
 
     private CardModel? PickRandomHandCard()
@@ -56,30 +60,54 @@ public sealed class AnanlinWhatDoesItMean()
         return selected is AnanlinWhatDoesItMeanAcceptOption;
     }
 
-    private async Task ApplyEffect(PlayerChoiceContext choiceContext, CardModel target, RandomEffect effect)
+    private async Task<Func<PlayerChoiceContext, Task>?> ApplyEffect(
+        PlayerChoiceContext choiceContext,
+        CardModel target,
+        RandomEffect effect)
     {
         switch (effect)
         {
             case RandomEffect.Free:
+                var originalCost = target.EnergyCost.Canonical;
                 target.EnergyCost.SetThisTurnOrUntilPlayed(0, reduceOnly: true);
-                break;
+                return ctx =>
+                {
+                    target.EnergyCost.SetThisTurnOrUntilPlayed(originalCost, reduceOnly: false);
+                    return Task.CompletedTask;
+                };
             case RandomEffect.DoubleDamage:
                 target.GetOrCreateCapability<AnanlinDoubleDamageOnceCapability>();
-                break;
+                return ctx =>
+                {
+                    if (target.TryGetCapability<AnanlinDoubleDamageOnceCapability>(out var capability))
+                        capability.RemoveFromOwner();
+                    return Task.CompletedTask;
+                };
             case RandomEffect.Exhaust:
                 CardCmd.ApplyKeyword(target, CardKeyword.Exhaust);
-                break;
+                return ctx =>
+                {
+                    target.RemoveKeyword(CardKeyword.Exhaust);
+                    return Task.CompletedTask;
+                };
             case RandomEffect.Replace:
-                await ReplaceWithSameRarity(choiceContext, target);
-                break;
+                var originalCanonical = target.CanonicalInstance;
+                if (!await ReplaceWithSameRarity(choiceContext, target)) return null;
+                return async ctx =>
+                {
+                    if (target.CombatState is not { } combatState) return;
+                    var restore = combatState.CreateCard(originalCanonical, Owner);
+                    AnanlinCardHelpers.CopyUpgradeLevel(target, restore);
+                    await CardCmd.Transform(target, restore, CardPreviewStyle.None);
+                };
             default:
                 throw new ArgumentOutOfRangeException(nameof(effect), effect, null);
         }
     }
 
-    private async Task ReplaceWithSameRarity(PlayerChoiceContext choiceContext, CardModel target)
+    private async Task<bool> ReplaceWithSameRarity(PlayerChoiceContext choiceContext, CardModel target)
     {
-        if (!target.IsTransformable) return;
+        if (!target.IsTransformable) return false;
 
         var candidates = Owner.Character.CardPool
             .GetUnlockedCards(Owner.UnlockState, Owner.RunState.CardMultiplayerConstraint)
@@ -88,7 +116,7 @@ public sealed class AnanlinWhatDoesItMean()
                 && card.CanBeGeneratedInCombat)
             .ToArray();
 
-        if (candidates.Length == 0) return;
+        if (candidates.Length == 0) return false;
 
         var replacement = CardFactory.GetForCombat(
                 Owner,
@@ -96,9 +124,10 @@ public sealed class AnanlinWhatDoesItMean()
                 1,
                 Owner.RunState.Rng.CombatCardGeneration)
             .FirstOrDefault();
-        if (replacement is null) return;
+        if (replacement is null) return false;
 
         AnanlinCardHelpers.CopyUpgradeLevel(target, replacement);
         await CardCmd.Transform(target, replacement, CardPreviewStyle.None);
+        return true;
     }
 }

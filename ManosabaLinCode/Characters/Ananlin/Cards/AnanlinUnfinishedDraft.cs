@@ -1,6 +1,8 @@
 using ManosabaLin.Characters.Ananlin.Relics;
 using ManosabaLin.Characters.Ema.Powers;
 using ManosabaLin.ManosabaLinCode.Characters.Hiro.Powers;
+using MegaCrit.Sts2.Core.Entities.Cards;
+using MegaCrit.Sts2.Core.Nodes.Cards;
 using MegaCrit.Sts2.Core.Nodes.CommonUi;
 using MegaCrit.Sts2.Core.Saves.Runs;
 
@@ -107,7 +109,8 @@ public sealed class AnanlinUnfinishedDraft()
 
         var wasComplete = IsComplete;
         AdvancePermanentUpgradeProgress();
-        if (wasComplete)
+        // 若本次打出的永久升级补上了最后一种魔法，立即生成【完稿】
+        if (wasComplete || IsComplete)
             await CreateFinishedDraft();
     }
 
@@ -213,7 +216,7 @@ public sealed class AnanlinUnfinishedDraft()
 
     private void AdvancePermanentUpgradeProgress()
     {
-        var deckVersion = DeckVersion as AnanlinUnfinishedDraft;
+        var deckVersion = FindDeckVersion();
         var progressCard = deckVersion ?? this;
         progressCard.PlayProgress++;
 
@@ -223,37 +226,73 @@ public sealed class AnanlinUnfinishedDraft()
             PermanentlyUpgradeSelf(deckVersion);
         }
 
-        if (!ReferenceEquals(progressCard, this))
-            PlayProgress = progressCard.PlayProgress;
+        // 把进度同步给同一张牌组卡的所有战斗内副本，保证每张未完稿都显示一致
+        SyncPlayProgressDisplay(progressCard);
+    }
+
+    /// <summary>
+    /// 找到本卡对应的牌组卡：优先用 DeckVersion；生成卡没有 DeckVersion 时，
+    /// 回退到玩家牌组中同名的未完稿，保证「牌组里面的卡牌同样升级一次」。
+    /// </summary>
+    private AnanlinUnfinishedDraft? FindDeckVersion()
+    {
+        if (DeckVersion is AnanlinUnfinishedDraft deckVersion)
+            return deckVersion;
+
+        return Owner?.Deck.Cards.OfType<AnanlinUnfinishedDraft>().FirstOrDefault();
+    }
+
+    private void SyncPlayProgressDisplay(AnanlinUnfinishedDraft progressCard)
+    {
+        if (Owner?.PlayerCombatState == null)
+            return;
+
+        foreach (var copy in Owner.PlayerCombatState.AllCards.OfType<AnanlinUnfinishedDraft>())
+        {
+            // 只同步与本次进度同源的副本：同一张牌组卡的所有克隆，或生成卡自身
+            if (copy.DeckVersion == progressCard || ReferenceEquals(copy, progressCard))
+                copy.PlayProgress = progressCard.PlayProgress;
+        }
     }
 
     private void PermanentlyUpgradeSelf(AnanlinUnfinishedDraft? deckVersion)
     {
-        if (deckVersion is null)
+        if (deckVersion is not null)
         {
+            if (!deckVersion.IsUpgradable)
+                return;
+
+            // 牌组卡升级：+1 伤害并记录 1 种尚未记录的魔法
+            CardCmd.Upgrade(deckVersion, CardPreviewStyle.None);
+
+            // 战斗内本卡同步升级（不再重复记录魔法），并把牌组已记录的魔法同步回来
+            if (!IsUpgradable)
+                return;
+
+            _suppressMagicRecordOnNextUpgrade = true;
+            try
+            {
+                UpgradeInternal();
+                FinalizeUpgradeInternal();
+            }
+            finally
+            {
+                _suppressMagicRecordOnNextUpgrade = false;
+            }
+
+            RecordedMagicMask = deckVersion.RecordedMagicMask;
+        }
+        else
+        {
+            // 没有牌组卡（纯生成）：只升级战斗内本卡，正常记录 1 种新魔法
             CardCmd.Upgrade(this, CardPreviewStyle.None);
-            return;
         }
 
-        if (!deckVersion.IsUpgradable)
-            return;
-
-        CardCmd.Upgrade(deckVersion, CardPreviewStyle.None);
-        if (!IsUpgradable)
-            return;
-
-        _suppressMagicRecordOnNextUpgrade = true;
-        try
+        // 刷新本卡卡面视觉（正在打出/位于手牌中的卡不会自动刷新升级后的数值）
+        if (NCard.FindOnTable(this) is { } node)
         {
-            UpgradeInternal();
-            FinalizeUpgradeInternal();
+            node.UpdateVisuals(Pile?.Type ?? PileType.None, CardPreviewMode.Normal);
         }
-        finally
-        {
-            _suppressMagicRecordOnNextUpgrade = false;
-        }
-
-        RecordedMagicMask = deckVersion.RecordedMagicMask;
     }
 
     protected override void OnUpgrade(ComponentContext componentContext)

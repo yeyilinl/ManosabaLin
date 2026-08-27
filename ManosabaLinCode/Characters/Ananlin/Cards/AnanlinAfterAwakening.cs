@@ -9,14 +9,12 @@ public sealed class AnanlinAfterAwakening()
 {
     protected override IEnumerable<DynamicVar> CanonicalVars =>
     [
-        new CardsVar(2),
-        new PowerVar<SilentPower>("Silence", 1m)
+        new CardsVar(2)
     ];
 
     protected override IEnumerable<IHoverTip> AdditionalHoverTips =>
     [
-        HoverTipFactory.FromPower<AnanlinPeaceOfMindPower>(),
-        HoverTipFactory.FromPower<SilentPower>()
+        HoverTipFactory.FromPower<AnanlinPeaceOfMindPower>()
     ];
 
     protected override async Task OnPlay(
@@ -34,8 +32,8 @@ public sealed class AnanlinAfterAwakening()
         }
 
         var peace = this.PeaceOfMindAmount();
-        if (peace > 0 && this.Sketchbook() is { } sketchbook)
-            await sketchbook.AddSilence(choiceContext, peace * DynamicVars["Silence"].IntValue, this);
+        if (peace > 0)
+            await PlayerCmd.GainEnergy(peace, Owner);
     }
 
     protected override void OnUpgrade(ComponentContext componentContext)

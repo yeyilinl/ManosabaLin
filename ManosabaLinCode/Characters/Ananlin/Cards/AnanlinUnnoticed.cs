@@ -40,13 +40,19 @@ public sealed class AnanlinUnnoticed()
             return;
         }
 
-        var power = await PowerCmd.Apply<AnanlinUnnoticedPower>(
-            choiceContext,
-            Owner.Creature,
-            1,
-            Owner.Creature,
-            this);
-        power?.Arm(this, DynamicVars.Cards.IntValue);
+        // 有敌人攻击意图：消耗掉全部安心，每消耗1层额外造成一次6点伤害
+        var peace = Owner.Creature.GetPower<AnanlinPeaceOfMindPower>();
+        var lost = Math.Max(0, (int)(peace?.Amount ?? 0));
+        if (peace is { Amount: > 0 })
+            await PowerCmd.ModifyAmount(choiceContext, peace, -peace.Amount, Owner.Creature, this);
+
+        if (lost <= 0) return;
+        await DamageCmd.Attack(DynamicVars.Damage.BaseValue)
+            .WithHitCount(lost)
+            .FromCard(this, cardPlay)
+            .Targeting(target)
+            .WithHitFx("vfx/vfx_attack_blunt")
+            .Execute(choiceContext);
     }
 
     protected override void OnUpgrade(ComponentContext componentContext)

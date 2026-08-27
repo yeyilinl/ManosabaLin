@@ -1,5 +1,7 @@
 using MinionLib.Component.Core;
 using ManosabaLin.Characters.Common;
+using ManosabaLin.Characters.Common.AncientCurses;
+using ManosabaLin.Characters.Common.Components;
 using MegaCrit.Sts2.Core.CardSelection;
 using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.Entities.Cards;
@@ -12,16 +14,19 @@ using System.Linq;
 namespace ManosabaLin.Characters.Hiro.Cards;
 
 [RegisterCard(typeof(LinCardPool))]
-public sealed class Hiroparanoid : ManosabaCardTemplate
+public sealed class Hiroparanoid : LinAncientCurseCard
 {
-    public Hiroparanoid() : base(1, CardType.Status, CardRarity.Ancient, TargetType.Self)
-    {
-    }
+    // 测试挂载：原罪组件正式由其他卡牌 AddComponent 添加，此处仅用于测试。
+    protected override IEnumerable<ICardComponent> CanonicalComponents => [new Originalsin()];
+
+    // 偏执属于特殊先古诅咒卡：1 费、可打出（覆盖基类的默认"无法打出"）。
+    public Hiroparanoid() : base(1, TargetType.Self) { }
 
     public override int MaxUpgradeLevel => 0;
 
     public override IEnumerable<CardKeyword> CanonicalKeywords
     {
+        // 可打出，无 Unplayable
         get { yield return CardKeyword.Exhaust; }
     }
 

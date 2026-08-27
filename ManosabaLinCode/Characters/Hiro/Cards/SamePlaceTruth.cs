@@ -24,6 +24,7 @@ public sealed class SamePlaceTruth()
     : ManosabaCardTemplate(1, CardType.Skill, CardRarity.Ancient, TargetType.Self), IEasyRightClickableCard
 {
     private const string EffectHoverLocEntry = "MANOSABA_LIN_CARD_SAME_PLACE_TRUTH_EFFECT";
+    private const string PendingTruthEffectLocEntry = "MANOSABA_LIN_CARD_SAME_PLACE_PENDING_TRUTH_EFFECT";
     private const string AutoPlayUnlockProgressKey = "AutoPlayUnlockProgress";
     private const string AutoPlayUnlockRequirementKey = "AutoPlayUnlockRequirement";
     private const int AutoPlayUnlockRequirement = 13;
@@ -65,6 +66,13 @@ public sealed class SamePlaceTruth()
         get
         {
             yield return CardEffectHoverTipFactory.FromCard(this, EffectHoverLocEntry);
+
+            // 右键强化（融合）已触发时，把【霜覆初心】的效果提示也并入本卡悬浮提示面板，
+            // 这样悬停/右键强化时能直接看到右侧拼接卡的效果本地化文本。
+            if (SamePlaceTruthFusionState.IsQueued(this))
+            {
+                yield return CardEffectHoverTipFactory.FromCard(this, PendingTruthEffectLocEntry);
+            }
         }
     }
 

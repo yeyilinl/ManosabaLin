@@ -48,7 +48,7 @@
   "MANOSABA_LIN_EVENT_TEAM_CARD_EXCHANGE_EVENT.pages.INITIAL.options.TEAMMATE_CARDS.title": "동료의 방법을 빌린다",
   "MANOSABA_LIN_EVENT_TEAM_CARD_EXCHANGE_EVENT.pages.INITIAL.options.TEAMMATE_CARDS.description": "무작위 동료 캐릭터의 [blue]희귀[/blue]와 [gold]에픽[/gold] 카드 8장에서 덱에 추가할 카드를 최대 3장 선택",
   "MANOSABA_LIN_EVENT_TEAM_CARD_EXCHANGE_EVENT.pages.INITIAL.options.TEAMMATE_CARDS_LOCKED.title": "동료의 방법을 빌린다（이용 불가）",
-  "MANOSABA_LIN_EVENT_TEAM_CARD_EXCHANGE_EVENT.pages.INITIAL.options.TEAMMATE_CARDS_LOCKED.description": "파티에 [color=#CC6666]히로[/color], [color=#ff99cc]에마[/color], 또는 [color=33ccff]셰리[/color] 플레이어가 최소 1명, 그리고 다른 캐릭터 플레이어가 최소 1명 필요",
+  "MANOSABA_LIN_EVENT_TEAM_CARD_EXCHANGE_EVENT.pages.INITIAL.options.TEAMMATE_CARDS_LOCKED.description": "파티에 [color=#CC6666]히로[/color], [color=#ff99cc]에마[/color], [color=33ccff]셰리[/color], [color=#6666cc]나츠메 아난[/color] 또는 [color=#aa66cc]위스테리아 아리사[/color] 플레이어가 최소 1명, 그리고 다른 캐릭터 플레이어가 최소 1명 필요",
   "MANOSABA_LIN_EVENT_TEAM_CARD_EXCHANGE_EVENT.pages.OWN_CARDS.selectionScreenPrompt": "자신의 캐릭터 카드에서 최대 3장 선택",
   "MANOSABA_LIN_EVENT_TEAM_CARD_EXCHANGE_EVENT.pages.TEAMMATE_CARDS.selectionScreenPrompt": "무작위 동료 캐릭터의 카드에서 최대 3장 선택",
   "MANOSABA_LIN_EVENT_TEAM_CARD_EXCHANGE_EVENT.pages.OWN_CARDS.description": "[b]당신은 자신의 노트로 돌아가, 가져갈 가치가 있는 부분을 남겼다[/b]",

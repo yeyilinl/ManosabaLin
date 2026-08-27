@@ -55,20 +55,26 @@ public sealed class BlessedObject : AnansSketchbook
 
     internal override async Task<IReadOnlyList<Creature>> TriggerSilenceRewriteAndGetTargets(PlayerChoiceContext choiceContext)
     {
-        if (!GrantedButterflyBeforeAttackIntentSilence && HasAnyEnemyAttackIntent())
-        {
-            GrantedButterflyBeforeAttackIntentSilence = true;
-            Flash();
-            await PowerCmd.Apply<CrimsonbutterflyPower>(
-                choiceContext,
-                Owner.Creature,
-                2,
-                Owner.Creature,
-                null,
-                false);
-        }
+        await TryGrantButterflyBeforeAttackIntentSilence(choiceContext);
 
         return await base.TriggerSilenceRewriteAndGetTargets(choiceContext);
+    }
+
+    /// <summary>本场战斗第一次在敌人有攻击意图时触发【缄默】或【洗脑】前，获得2层【蝴蝶】。</summary>
+    internal async Task TryGrantButterflyBeforeAttackIntentSilence(PlayerChoiceContext choiceContext)
+    {
+        if (GrantedButterflyBeforeAttackIntentSilence) return;
+        if (!HasAnyEnemyAttackIntent()) return;
+
+        GrantedButterflyBeforeAttackIntentSilence = true;
+        Flash();
+        await PowerCmd.Apply<CrimsonbutterflyPower>(
+            choiceContext,
+            Owner.Creature,
+            2,
+            Owner.Creature,
+            null,
+            false);
     }
 
     public override async Task AfterSideTurnEnd(

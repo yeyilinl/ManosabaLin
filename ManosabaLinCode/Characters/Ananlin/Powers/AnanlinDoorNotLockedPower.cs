@@ -41,7 +41,11 @@ public sealed class AnanlinDoorNotLockedPower : ManosabaPowerTemplate
         await base.AfterPowerAmountChanged(choiceContext, power, amount, applier, cardSource);
 
         if (Used && power is AnanlinPeaceOfMindPower && power.Owner == Owner && amount < 0)
+        {
+            if (Owner.Player is { } player)
+                await PlayerCmd.GainEnergy(1, player);
             await PowerCmd.Remove(this);
+        }
     }
 
     public override async Task AfterSideTurnEnd(
@@ -51,7 +55,7 @@ public sealed class AnanlinDoorNotLockedPower : ManosabaPowerTemplate
     {
         if (side != Owner.Side || Used) return;
 
-        await PowerCmd.Apply<SilentPower>(choiceContext, Owner, 1, Owner, null);
+        await PowerCmd.Apply<AnanlinPeaceOfMindPower>(choiceContext, Owner, 1, Owner, null);
         await PowerCmd.Remove(this);
     }
 

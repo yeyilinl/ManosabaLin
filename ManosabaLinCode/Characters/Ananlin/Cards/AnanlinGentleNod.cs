@@ -39,7 +39,7 @@ public sealed class AnanlinGentleNod()
                 choiceContext,
                 peace * DynamicVars.Cards.IntValue,
                 card => AnanlinCardHelpers.IsPlayableCombatCard(card) && card.Type != CardType.Attack);
-            await this.LosePeaceOfMind(choiceContext);
+            await this.LosePeaceOfMind(choiceContext, 2);
             this.Sketchbook()?.QueueNonAttackRepeatThisTurn(DynamicVars["ExtraPlays"].IntValue);
         }
     }

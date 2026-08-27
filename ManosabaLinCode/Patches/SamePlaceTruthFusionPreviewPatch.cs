@@ -7,6 +7,7 @@ using MegaCrit.Sts2.Core.Helpers;
 using MegaCrit.Sts2.Core.Nodes.Cards;
 using MegaCrit.Sts2.Core.Nodes.Cards.Holders;
 using MegaCrit.Sts2.Core.Nodes.Combat;
+using MegaCrit.Sts2.Core.Nodes.HoverTips;
 using MegaCrit.Sts2.Core.Models;
 using HiroCharacter = ManosabaLin.Characters.Hiro.Hiro;
 
@@ -60,14 +61,12 @@ internal static class SamePlaceTruthFusionPreviewPatch
             return;
         }
 
-        if (__instance.CardModel is SamePlaceTruth truth && !ShouldKeepQueuedAfterUnfocus(__instance))
-        {
-            SamePlaceTruthFusionState.Reset(truth);
-            RemovePreview(__instance.CardNode);
-            return;
-        }
-
-        Refresh(__instance.CardNode);
+        // 失焦只隐藏预览，绝不清除右键强化队列：
+        // SamePlaceTruthFusionState 是进程内静态状态，失焦事件只会在主机端触发，
+        // 若在主机端 Reset 而客户端队列保留，打出时 Consume 结果不一致，
+        // 会直接导致多人状态分歧（desync）。
+        // 队列只在正常打出（Consume）或打出被取消（NCardPlay.Cleanup(false)）时清除。
+        RemovePreview(__instance.CardNode);
     }
 
     [HarmonyPatch(typeof(NCardPlay), "Cleanup", [typeof(bool)])]
@@ -83,6 +82,9 @@ internal static class SamePlaceTruthFusionPreviewPatch
         {
             SamePlaceTruthFusionState.Reset(truth);
         }
+
+        // 一个右键强化队列周期结束，允许下一次右键重新触发提示面板重建
+        HolderTipsRefreshed.Remove(truth);
 
         RemovePreview(GetCurrentCardNode(__instance) ?? NCard.FindOnTable(truth));
     }
@@ -121,6 +123,8 @@ internal static class SamePlaceTruthFusionPreviewPatch
         if (cardNode.Model is SamePlaceTruth truth && SamePlaceTruthFusionState.IsQueued(truth))
         {
             EnsurePreview(cardNode);
+            // 同时把【霜覆初心】的效果提示并入本卡正在显示的悬浮提示面板
+            RefreshHolderHoverTipsOnce(truth);
         }
         else
         {
@@ -128,12 +132,40 @@ internal static class SamePlaceTruthFusionPreviewPatch
         }
     }
 
-    private static bool IsCardPlayInProgress()
+    /// <summary>
+    /// 每个右键强化队列周期，只把持有者提示面板重建一次（Remove + CreateHoverTips）：
+    /// 面板内容在创建时从 CardModel.HoverTips 取值，而右键后 HoverTips 已包含
+    /// 【霜覆初心】的效果提示（见 SamePlaceTruth.AdditionalHoverTips），
+    /// 重建后面板会立即显示霜覆初心的效果本地化文本。
+    /// UpdateVisuals 会高频触发，必须用标记集防抖。
+    /// </summary>
+    private static readonly HashSet<CardModel> HolderTipsRefreshed = new(ReferenceEqualityComparer.Instance);
+
+    private static void RefreshHolderHoverTipsOnce(SamePlaceTruth truth)
+    {
+        if (!HolderTipsRefreshed.Add(truth))
+        {
+            return;
+        }
+
+        var holder = NPlayerHand.Instance?.GetCardHolder(truth);
+        var active = holder != null && HasActiveHoverTipSet(holder);
+        if (holder == null || !active)
+        {
+            return;
+        }
+
+        // 面板当前正在显示：按新状态重建一次；未显示时无需处理（下次悬停自然带上新提示）
+        NHoverTipSet.Remove(holder);
+        AccessTools.Method(typeof(NCardHolder), "CreateHoverTips")?.Invoke(holder, null);
+    }
+
+    private static bool HasActiveHoverTipSet(Control owner)
     {
         try
         {
-            return NPlayerHand.Instance?.InCardPlay == true
-                || (NTargetManager.Instance != null && NTargetManager.Instance.IsInSelection);
+            var active = AccessTools.Field(typeof(NHoverTipSet), "_activeHoverTips")?.GetValue(null);
+            return active is System.Collections.IDictionary dict && dict.Contains(owner);
         }
         catch
         {
@@ -151,17 +183,6 @@ internal static class SamePlaceTruthFusionPreviewPatch
         {
             return false;
         }
-    }
-
-    private static bool ShouldKeepQueuedAfterUnfocus(NCardHolder holder)
-    {
-        return IsCardPlayInProgress() || Input.IsMouseButtonPressed(MouseButton.Left) || IsPointerOver(holder);
-    }
-
-    private static bool IsPointerOver(NCardHolder holder)
-    {
-        return holder is Control control &&
-               control.GetGlobalRect().HasPoint(control.GetGlobalMousePosition());
     }
 
     private static CardModel? GetCurrentCard(NCardPlay cardPlay)

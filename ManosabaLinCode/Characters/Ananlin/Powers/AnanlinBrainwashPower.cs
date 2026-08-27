@@ -55,6 +55,11 @@ public sealed class AnanlinBrainwashPower : ManosabaPowerTemplate, IEasyRightCli
         var silenceCost = CurrentRequiredSilenceCost;
         var paidSilenceCost = false;
 
+        // 受祝福之物：本场战斗第一次在敌人有攻击意图时触发【洗脑】前，获得2层【蝴蝶】
+        var blessedObject = clickContext.Player.Relics.OfType<BlessedObject>().FirstOrDefault();
+        if (blessedObject is not null)
+            await blessedObject.TryGrantButterflyBeforeAttackIntentSilence(choiceContext);
+
         async Task<bool> SpendSilenceCost()
         {
             if (useNoahAssist) return true;

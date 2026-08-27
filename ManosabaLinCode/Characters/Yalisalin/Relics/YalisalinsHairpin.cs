@@ -1,6 +1,7 @@
 using ManosabaLin.Characters.Yalisalin.Capabilities;
 using ManosabaLin.Characters.Yalisalin.Cards;
 using ManosabaLin.Characters.Yalisalin.Components;
+using ManosabaLin.Characters.Yalisalin.Powers;
 using MegaCrit.Sts2.Core.Models.Powers;
 using MegaCrit.Sts2.Core.Rooms;
 using MegaCrit.Sts2.Core.Saves.Runs;
@@ -207,6 +208,53 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
         return true;
     }
 
+    public bool TrySealEarliestFireColor(Creature target, out YalisalinFireColor color)
+    {
+        color = default;
+        if (!_gauges.TryGetValue(target, out var gauge) || !gauge.TryRemoveEarliest(out color))
+            return false;
+
+        GrantSealedFire(color);
+        _currentFireColorTarget = target;
+        return true;
+    }
+
+    public IReadOnlyList<YalisalinFireColor> SealEarliestDistinctFireColors(Creature target, int count)
+    {
+        if (!_gauges.TryGetValue(target, out var gauge) || count <= 0)
+            return [];
+
+        var sealedColors = new List<YalisalinFireColor>();
+        foreach (var segment in gauge.Segments)
+        {
+            if (sealedColors.Contains(segment.Color))
+                continue;
+            if (!gauge.TryRemoveSegment(segment))
+                continue;
+
+            sealedColors.Add(segment.Color);
+            if (sealedColors.Count >= count)
+                break;
+        }
+
+        foreach (var color in sealedColors)
+            GrantSealedFire(color);
+
+        if (sealedColors.Count > 0)
+            _currentFireColorTarget = target;
+        return sealedColors;
+    }
+
+    public bool TrySealFireColorSegment(Creature target, YalisalinFireColorSegment segment)
+    {
+        if (!_gauges.TryGetValue(target, out var gauge) || !gauge.TryRemoveSegment(segment))
+            return false;
+
+        GrantSealedFire(segment.Color);
+        _currentFireColorTarget = target;
+        return true;
+    }
+
     public bool TryGetEarliestFireColor(Creature target, out YalisalinFireColor color)
     {
         color = default;
@@ -248,12 +296,19 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
 
         _currentFireColorTarget = target;
         var gauge = GetOrCreateGauge(target);
+        var wasFull = gauge.IsFull;
         gauge.InsertColor(color, slotIndex, ref _conversionSequence);
 
-        if (ThirteenthListeningEnabled && !ThirteenthCoverUsedThisTurn && gauge.IsFull)
+        // 只有插回补满（从未满→满）才触发补满效果；满量表替换掉对应火色不触发
+        if (!wasFull && gauge.IsFull)
         {
-            ThirteenthCoverUsedThisTurn = true;
-            GainPreserveHighestFireColor(1);
+            AfterTargetFireColorFilledToFull();
+
+            if (ThirteenthListeningEnabled && !ThirteenthCoverUsedThisTurn)
+            {
+                ThirteenthCoverUsedThisTurn = true;
+                GainPreserveHighestFireColor(1);
+            }
         }
 
         Flash();
@@ -966,6 +1021,7 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
         {
             MixedConclusionUsedThisTurn = true;
             GrantSealedFire(color);
+            await YalisalinSealedFirePower.Sync(choiceContext, Owner, source);
             await CardPileCmd.Draw(choiceContext, 1, Owner);
         }
 
@@ -990,6 +1046,7 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
             {
                 ThirteenthRewriteUsedThisTurn = true;
                 GrantSealedFire(segment.Color);
+                await YalisalinSealedFirePower.Sync(choiceContext, Owner, source);
             }
         }
     }
@@ -1173,7 +1230,7 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
         return cardSource?.Owner == Owner;
     }
 
-    private bool CanTrack(Creature target)
+    public bool CanTrack(Creature target)
     {
         return target.IsAlive && target.Side != Owner.Creature.Side;
     }
@@ -1187,6 +1244,20 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
         _gauges[target] = gauge;
         return gauge;
     }
+
+    public int GetSealedFireCount(YalisalinFireColor color)
+    {
+        return color switch
+        {
+            YalisalinFireColor.LightOrange => SealedLightOrange,
+            YalisalinFireColor.BrightYellow => SealedBrightYellow,
+            YalisalinFireColor.Red => SealedRed,
+            YalisalinFireColor.BlackRed => SealedBlackRed,
+            _ => 0
+        };
+    }
+
+    public bool HasSealedFireOf(YalisalinFireColor color) => GetSealedFireCount(color) > 0;
 }
 
 public enum YalisalinFireColor
@@ -1306,14 +1377,37 @@ internal sealed class YalisalinFireColorGauge
         return true;
     }
 
+    public bool TryRemoveEarliest(out YalisalinFireColor color)
+    {
+        color = default;
+        var ordered = OrderedSegments().ToArray();
+        if (ordered.Length == 0)
+            return false;
+
+        color = ordered[0].Color;
+        return _segments.Remove(ordered[0]);
+    }
+
+    public bool TryRemoveSegment(YalisalinFireColorSegment segment)
+    {
+        return _segments.Remove(segment);
+    }
+
     public void InsertColor(YalisalinFireColor color, int slotIndex, ref long conversionSequence)
     {
         var ordered = OrderedSegments().ToList();
-        var index = Math.Clamp(slotIndex, 0, ordered.Count);
-        ordered.Insert(index, new YalisalinFireColorSegment(color, 0));
 
-        if (ordered.Count > YalisalinsHairpin.MaxSegments)
-            ordered.RemoveAt(ordered.Count - 1);
+        if (ordered.Count >= YalisalinsHairpin.MaxSegments)
+        {
+            // 量表已满：直接替换掉对应位置的火色（不增加总格数）
+            var replaceIndex = Math.Clamp(slotIndex, 0, ordered.Count - 1);
+            ordered[replaceIndex] = new YalisalinFireColorSegment(color, 0);
+        }
+        else
+        {
+            var index = Math.Clamp(slotIndex, 0, ordered.Count);
+            ordered.Insert(index, new YalisalinFireColorSegment(color, 0));
+        }
 
         _segments.Clear();
         foreach (var segment in ordered)

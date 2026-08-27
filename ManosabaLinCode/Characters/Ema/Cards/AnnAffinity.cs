@@ -35,7 +35,10 @@ public sealed class AnnAffinity : ManosabaCardTemplate
         var creature = owner.Creature;
 
         var bond = creature.GetPower<BondPower>();
-        if (bond != null) bond.Affinity++;
+        if (bond is null)
+            bond = await PowerCmd.Apply<BondPower>(choiceContext, creature, 1m, creature, this, false);
+        if (bond is not null)
+            bond.Affinity++;
 
         var pickCount = DynamicVars["PickCount"].IntValue;
 

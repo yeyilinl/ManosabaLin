@@ -8,10 +8,13 @@ using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.GameActions.Multiplayer;
 using MegaCrit.Sts2.Core.HoverTips;
 using MegaCrit.Sts2.Core.Localization.DynamicVars;
+using MegaCrit.Sts2.Core.Nodes.Cards;
+using MegaCrit.Sts2.Core.Nodes.Combat;
 using MinionLib.Component.Core;
 using STS2RitsuLib.Interop.AutoRegistration;
 using STS2RitsuLib.Keywords;
 using STS2RitsuLib.Models.Capabilities;
+using Godot;
 
 namespace ManosabaLin.Characters.Hiro.Cards;
 
@@ -29,6 +32,16 @@ public sealed class SamePlaceTrace() : ManosabaCardTemplate(1, CardType.Skill, C
     private int _autoPlayProgress;
     private int _clueCount;
     private bool _completionTriggered;
+
+    /// <summary>
+    /// 本次打出时刚被加入抽牌堆的副本标记：这些副本不能立刻被本次打出的【轮回】触发，
+    /// 只能触发原本就在抽牌堆的卡牌。下一次手动打出本牌时统一清除该标记。
+    /// </summary>
+    private bool _justAddedToDrawPile;
+
+    internal bool JustAddedToDrawPile => _justAddedToDrawPile;
+
+    internal void ClearJustAddedToDrawPileFlag() => _justAddedToDrawPile = false;
 
     public override IEnumerable<CardKeyword> CanonicalKeywords
     {
@@ -62,6 +75,17 @@ public sealed class SamePlaceTrace() : ManosabaCardTemplate(1, CardType.Skill, C
 
     protected override async Task OnPlay(PlayerChoiceContext choiceContext, CardPlay cardPlay, ComponentContext componentContext)
     {
+        // 手动打出时：让此前加入抽牌堆的副本恢复为可被【轮回】触发；
+        // 本次刚加入的副本在下方 AddTemporaryCopiesToDrawPile 里打上“刚加入”标记，
+        // 使【轮回】只能触发原本就在抽牌堆的卡牌。
+        if (!cardPlay.IsAutoPlay)
+        {
+            foreach (var trace in GetAllSamePlaceTraceCards())
+            {
+                trace.ClearJustAddedToDrawPileFlag();
+            }
+        }
+
         await AddTemporaryCopiesToDrawPile();
         await CardPileCmd.Draw(choiceContext, DynamicVars.Cards.BaseValue, Owner);
 
@@ -94,6 +118,8 @@ public sealed class SamePlaceTrace() : ManosabaCardTemplate(1, CardType.Skill, C
             }
 
             copy.SetProgressLocal(progress.AutoPlayProgress, progress.ClueCount, progress.CompletionTriggered);
+            // 刚加入抽牌堆：本次打出的【轮回】不能立刻触发它
+            copy._justAddedToDrawPile = true;
             await CardPileCmd.AddGeneratedCardToCombat(copy, PileType.Draw, Owner, CardPilePosition.Random);
         }
     }
@@ -143,26 +169,52 @@ public sealed class SamePlaceTrace() : ManosabaCardTemplate(1, CardType.Skill, C
             return;
         }
 
-        await ExhaustAllSamePlaceTrace(choiceContext);
+        await RemoveAllSamePlaceTrace(choiceContext);
         await GainAncientPlaceholder();
     }
 
-    private async Task ExhaustAllSamePlaceTrace(PlayerChoiceContext choiceContext)
+    private async Task RemoveAllSamePlaceTrace(PlayerChoiceContext choiceContext)
     {
+        // 先打断当前正在结算中的同一处痕迹（Play 牌堆）：立即移出战斗并手动清理视觉节点，
+        // 防止引擎在结算完成后把它放回弃牌堆，保证生成旧识疑影后战斗内没有一张同一处痕迹。
         foreach (var trace in GetAllSamePlaceTraceCards()
-                     .Where(card => card.Pile?.Type is PileType.Hand or PileType.Draw or PileType.Discard)
+                     .Where(card => card.Pile is { IsCombatPile: true } && card.Pile.Type == PileType.Play)
                      .ToList())
         {
-            await CardCmd.Exhaust(choiceContext, trace);
+            var node = NCard.FindOnTable(trace);
+            await CardPileCmd.RemoveFromCombat(trace, skipVisuals: true);
+            if (node != null && GodotObject.IsInstanceValid(node) && !node.IsQueuedForDeletion())
+            {
+                node.QueueFree();
+            }
         }
 
-        ExhaustOnNextPlay = true;
-        AddKeyword(CardKeyword.Exhaust);
+        // 其余战斗牌堆（手牌/抽牌堆/弃牌堆/消耗牌堆）中的同一处痕迹：
+        // 按本地化“移除所有同一处痕迹”，全部移出战斗（不再进入消耗牌堆）。
+        // 手牌需要先移除对应手牌 UI 槽位，避免残留空手牌位。
+        foreach (var trace in GetAllSamePlaceTraceCards()
+                     .Where(card => card.Pile?.Type is PileType.Hand or PileType.Draw or PileType.Discard or PileType.Exhaust)
+                     .ToList())
+        {
+            if (trace.Pile?.Type == PileType.Hand && NPlayerHand.Instance?.GetCardHolder(trace) is { } holder)
+            {
+                NPlayerHand.Instance.RemoveCardHolder(holder);
+            }
+
+            await CardPileCmd.RemoveFromCombat(trace, skipVisuals: true);
+        }
     }
 
     private async Task GainAncientPlaceholder()
     {
-        var ancientCard = CombatState.CreateCard<SamePlaceTruth>(Owner);
+        // 注意：RemoveAllSamePlaceTrace 会把正在结算中的这张同一处痕迹也移出战斗，
+        // 它的 CombatState 随即变为 null，不能再用 this.CombatState，否则空引用。
+        if (Owner?.Creature.CombatState is not { } combatState)
+        {
+            return;
+        }
+
+        var ancientCard = combatState.CreateCard<SamePlaceTruth>(Owner);
         await CardPileCmd.AddGeneratedCardToCombat(ancientCard, PileType.Hand, Owner);
     }
 

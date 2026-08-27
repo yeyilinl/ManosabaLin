@@ -1,5 +1,7 @@
+using ManosabaLin.Characters.Ananlin;
 using ManosabaLin.Characters.Emalin;
 using ManosabaLin.Characters.Sherrylin;
+using ManosabaLin.Characters.Yalisalin;
 using ManosabaLin.Settings;
 using MegaCrit.Sts2.Core.CardSelection;
 using MegaCrit.Sts2.Core.Entities.Players;
@@ -116,6 +118,7 @@ public sealed class TeamCardExchangeEvent : ModEventTemplate
     private static bool IsManosabaMainCharacter(Player player)
     {
         var cardPool = player.Character.CardPool;
-        return cardPool is HiroCardPool or EmalinCardPool or SherrylinCardPool;
+        return cardPool is HiroCardPool or EmalinCardPool or SherrylinCardPool
+            or AnanlinCardPool or YalisalinCardPool;
     }
 }

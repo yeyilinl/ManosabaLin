@@ -58,6 +58,12 @@ public sealed class CardSixty : ManosabaCardTemplate
 
         foreach (var originalCard in selectedCards)
         {
+            // 给予选择的卡【轮回】关键词（对应卡面描述「选择{SelectCount}张手牌获得【轮回】」）
+            if (!TransmigrationRules.HasTransmigration(originalCard))
+            {
+                originalCard.AddModKeyword(TransmigrationRules.TransmigrationCardKeyword);
+            }
+
             for (var i = 0; i < copyCount; i++)
             {
                 var clonedCard = source.CombatState.CreateCard(originalCard.CanonicalInstance, owner);

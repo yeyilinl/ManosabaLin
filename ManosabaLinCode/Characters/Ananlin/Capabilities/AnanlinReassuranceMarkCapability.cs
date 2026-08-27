@@ -10,4 +10,9 @@ namespace ManosabaLin.Characters.Ananlin.Capabilities;
 [RegisterModelCapability]
 public sealed class AnanlinReassuranceMarkCapability : ManosabaCardCapability
 {
+    // 显式指定本地化前缀：能力注册 ID 是大写形式（MANOSABA_LIN_MODELCAPABILITY_*），
+    // 与本地化文件中的“ManosabaLin.ClassName”键不匹配，基类默认用 Id.Entry 会取不到文本。
+    private const string LocPrefix = "ManosabaLin.AnanlinReassuranceMarkCapability";
+
+    protected override string LocKeyPrefix => LocPrefix;
 }

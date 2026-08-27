@@ -39,7 +39,10 @@ public sealed class AnnEstrangement : ManosabaCardTemplate
         var target = cardPlay.Target!;
 
         var bond = creature.GetPower<BondPower>();
-        if (bond != null) bond.Estrangement++;
+        if (bond is null)
+            bond = await PowerCmd.Apply<BondPower>(choiceContext, creature, 1m, creature, this, false);
+        if (bond is not null)
+            bond.Estrangement++;
 
         await PowerCmd.Apply<WeakPower>(
             choiceContext, target, 2, creature, this, false);

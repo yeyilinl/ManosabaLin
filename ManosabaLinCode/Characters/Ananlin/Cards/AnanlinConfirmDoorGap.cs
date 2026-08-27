@@ -34,7 +34,6 @@ public sealed class AnanlinConfirmDoorGap()
             new CardSelectorPrefs(SelectionScreenPrompt, 1, 1))).FirstOrDefault();
         if (selected is null) return;
 
-        var attacksPlayed = this.Sketchbook()?.AttacksPlayedThisTurn ?? 0;
         if (this.PeaceOfMindAmount() <= 0)
             await this.GainPeaceOfMind(choiceContext);
 
@@ -45,7 +44,7 @@ public sealed class AnanlinConfirmDoorGap()
             1,
             Owner.Creature,
             this);
-        power?.Track(selected, bonusBlock, attacksPlayed);
+        power?.Track(selected, bonusBlock);
     }
 
     protected override void OnUpgrade(ComponentContext componentContext)

@@ -25,10 +25,7 @@ public sealed class AnanlinFakeDeathAct()
         CardPlay cardPlay,
         ComponentContext componentContext)
     {
-        var peace = Owner.Creature.GetPower<AnanlinPeaceOfMindPower>();
-        var lostPeace = Math.Max(0, (int)(peace?.Amount ?? 0));
-        if (peace is { Amount: > 0 })
-            await PowerCmd.ModifyAmount(choiceContext, peace, -peace.Amount, Owner.Creature, this);
+        var lostPeace = await this.LosePeaceOfMind(choiceContext, int.MaxValue);
 
         await PowerCmd.Apply<CrimsonbutterflyPower>(
             choiceContext,

@@ -141,6 +141,8 @@ internal static class AnanlinSilenceIntentManager
 
         MarkReplacementIntentUsed(owner, selectedBuff.Kind);
         RewritesThisCombatByPlayer[owner] = GetRewritesThisCombat(owner) + rewrittenTargets.Count;
+        if (owner.Creature.GetPower<AnanlinSealedPagePower>() is { } sealedPage)
+            await sealedPage.AfterSilenceRightClickRewrite(choiceContext);
         RecordIntentRewrites(combatState, rewrittenTargets.Count);
         return rewrittenTargets;
     }

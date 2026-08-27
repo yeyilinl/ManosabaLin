@@ -37,7 +37,14 @@ public sealed class AnanlinClutchSleeve()
         if (this.PeaceOfMindAmount() <= 0)
             await this.GainPeaceOfMind(choiceContext);
 
-        selected.GiveSingleTurnRetain();
+        // 若有两层安心：消耗两层，使该牌获得【重放1】
+        if (this.PeaceOfMindAmount() >= 2)
+        {
+            var peace = Owner.Creature.GetPower<AnanlinPeaceOfMindPower>();
+            if (peace is not null)
+                await PowerCmd.ModifyAmount(choiceContext, peace, -2, Owner.Creature, this);
+            selected.BaseReplayCount++;
+        }
 
         var reduction = this.PeaceOfMindAmount() * DynamicVars["CostReduction"].IntValue;
         if (reduction > 0)

@@ -1,7 +1,7 @@
 namespace ManosabaLin.Characters.Ananlin.Cards;
 
 [RegisterCard(typeof(AnanlinCardPool))]
-public sealed class AnanlinThreeColorBookmark() : ManosabaCardTemplate(2, CardType.Skill, CardRarity.Common, TargetType.Self)
+public sealed class AnanlinThreeColorBookmark() : ManosabaCardTemplate(1, CardType.Skill, CardRarity.Common, TargetType.Self)
 {
     public override bool GainsBlock => true;
 

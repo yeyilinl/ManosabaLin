@@ -10,10 +10,7 @@ public sealed class AnanlinMiriasMoviePromise() : ManosabaCardTemplate(1, CardTy
         get { yield return CardKeyword.Exhaust; }
     }
 
-    protected override IEnumerable<IHoverTip> AdditionalHoverTips =>
-    [
-        HoverTipFactory.FromPower<AnanlinMoviePromisePower>()
-    ];
+   
 
     protected override async Task OnPlay(PlayerChoiceContext choiceContext, CardPlay cardPlay, ComponentContext componentContext)
     {

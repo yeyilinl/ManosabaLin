@@ -48,7 +48,7 @@
   "MANOSABA_LIN_EVENT_TEAM_CARD_EXCHANGE_EVENT.pages.INITIAL.options.TEAMMATE_CARDS.title": "仲間のやり方を借りる",
   "MANOSABA_LIN_EVENT_TEAM_CARD_EXCHANGE_EVENT.pages.INITIAL.options.TEAMMATE_CARDS.description": "ランダムな仲間キャラクターの[blue]アンコモン[/blue]と[gold]レア[/gold]のカード8枚から、デッキに加えるカードを最大3枚選ぶ",
   "MANOSABA_LIN_EVENT_TEAM_CARD_EXCHANGE_EVENT.pages.INITIAL.options.TEAMMATE_CARDS_LOCKED.title": "仲間のやり方を借りる（利用不可）",
-  "MANOSABA_LIN_EVENT_TEAM_CARD_EXCHANGE_EVENT.pages.INITIAL.options.TEAMMATE_CARDS_LOCKED.description": "パーティに[color=#CC6666]ヒロ[/color]、[color=#ff99cc]エマ[/color]、または[color=33ccff]シェリー[/color]のプレイヤーが少なくとも1人、かつ他のキャラクターのプレイヤーが少なくとも1人必要",
+  "MANOSABA_LIN_EVENT_TEAM_CARD_EXCHANGE_EVENT.pages.INITIAL.options.TEAMMATE_CARDS_LOCKED.description": "パーティに[color=#CC6666]ヒロ[/color]、[color=#ff99cc]エマ[/color]、[color=33ccff]シェリー[/color]、[color=#6666cc]Natsume Anan[/color]または[color=#aa66cc]Wisteria Arisa[/color]のプレイヤーが少なくとも1人、かつ他のキャラクターのプレイヤーが少なくとも1人必要",
   "MANOSABA_LIN_EVENT_TEAM_CARD_EXCHANGE_EVENT.pages.OWN_CARDS.selectionScreenPrompt": "自分のキャラクターのカードから最大3枚選ぶ",
   "MANOSABA_LIN_EVENT_TEAM_CARD_EXCHANGE_EVENT.pages.TEAMMATE_CARDS.selectionScreenPrompt": "ランダムな仲間キャラクターのカードから最大3枚選ぶ",
   "MANOSABA_LIN_EVENT_TEAM_CARD_EXCHANGE_EVENT.pages.OWN_CARDS.description": "[b]あなたは自分のノートに戻り、持ち帰る価値のある部分を残した[/b]",

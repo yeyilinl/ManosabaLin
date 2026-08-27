@@ -48,7 +48,7 @@
   "MANOSABA_LIN_EVENT_TEAM_CARD_EXCHANGE_EVENT.pages.INITIAL.options.TEAMMATE_CARDS.title": "Borrow teammates' methods",
   "MANOSABA_LIN_EVENT_TEAM_CARD_EXCHANGE_EVENT.pages.INITIAL.options.TEAMMATE_CARDS.description": "Choose up to 3 cards from 8 [blue]Uncommon[/blue] and [gold]Rare[/gold] cards of a random teammate character to add to your deck",
   "MANOSABA_LIN_EVENT_TEAM_CARD_EXCHANGE_EVENT.pages.INITIAL.options.TEAMMATE_CARDS_LOCKED.title": "Borrow teammates' methods (Unavailable)",
-  "MANOSABA_LIN_EVENT_TEAM_CARD_EXCHANGE_EVENT.pages.INITIAL.options.TEAMMATE_CARDS_LOCKED.description": "Requires at least one [color=#CC6666]Hiro[/color], [color=#ff99cc]Ema[/color], or [color=33ccff]Sherry[/color] player in the party, and at least one player of another character",
+  "MANOSABA_LIN_EVENT_TEAM_CARD_EXCHANGE_EVENT.pages.INITIAL.options.TEAMMATE_CARDS_LOCKED.description": "Requires at least one [color=#CC6666]Hiro[/color], [color=#ff99cc]Ema[/color], [color=33ccff]Sherry[/color], [color=#6666cc]Natsume Anan[/color], or [color=#aa66cc]Wisteria Arisa[/color] player in the party, and at least one player of another character",
   "MANOSABA_LIN_EVENT_TEAM_CARD_EXCHANGE_EVENT.pages.OWN_CARDS.selectionScreenPrompt": "Choose up to 3 cards from your character's cards",
   "MANOSABA_LIN_EVENT_TEAM_CARD_EXCHANGE_EVENT.pages.TEAMMATE_CARDS.selectionScreenPrompt": "Choose up to 3 cards from a random teammate character's cards",
   "MANOSABA_LIN_EVENT_TEAM_CARD_EXCHANGE_EVENT.pages.OWN_CARDS.description": "[b]You return to your own notes, keeping the parts worth taking[/b]",

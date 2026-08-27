@@ -27,7 +27,18 @@ public sealed class AnanlinRoomEcho()
         if (this.PeaceOfMindAmount() <= 0)
             await this.GainPeaceOfMind(choiceContext);
 
-        var bonus = this.PeaceOfMindAmount() * DynamicVars["Bonus"].IntValue;
+        var peace = this.PeaceOfMindAmount();
+        var bonus = peace * DynamicVars["Bonus"].IntValue;
+
+        // 造成等于安心层数的伤害
+        if (peace > 0 && cardPlay.Target is { IsAlive: true } baseTarget)
+        {
+            await DamageCmd.Attack(peace)
+                .FromCard(this, cardPlay)
+                .Targeting(baseTarget)
+                .WithHitFx("vfx/vfx_attack_blunt")
+                .Execute(choiceContext);
+        }
 
         if (sketchbook.LastPlayedCardType == CardType.Skill)
         {

@@ -67,6 +67,11 @@ public sealed class AnanlinBackstageResentmentPower : ManosabaPowerTemplate
         var count = Math.Max(0, (int)(Owner.GetPower<AnanlinPeaceOfMindPower>()?.Amount ?? 0));
         if (count <= 0) return;
 
+        // 消耗当前安心层数，再随机执行等量试镜效果
+        var peace = Owner.GetPower<AnanlinPeaceOfMindPower>();
+        if (peace is { Amount: > 0 })
+            await PowerCmd.ModifyAmount(choiceContext, peace, -count, Owner, null);
+
         Flash();
         var first = RollEffect(player);
         await ExecuteEffect(choiceContext, first);

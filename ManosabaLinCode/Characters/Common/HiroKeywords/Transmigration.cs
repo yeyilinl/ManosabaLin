@@ -44,8 +44,10 @@ public static class TransmigrationRules
         var discardPile = PileType.Discard.GetPile(owner);
 
         // 抽牌堆中的同名轮回卡（原有逻辑）
+        // 同一处痕迹：本次打出时刚加入抽牌堆的副本不能立刻被轮回触发，只触发原本就在抽牌堆的卡
         var matching = drawPile.Cards
-            .Where(c => c.Id == source.Id && c != source && HasTransmigration(c))
+            .Where(c => c.Id == source.Id && c != source && HasTransmigration(c)
+                        && !(c is SamePlaceTrace { JustAddedToDrawPile: true }))
             .Take(MaxCopiesToPlay)
             .ToList();
 

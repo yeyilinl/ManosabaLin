@@ -48,7 +48,7 @@
   "MANOSABA_LIN_EVENT_TEAM_CARD_EXCHANGE_EVENT.pages.INITIAL.options.TEAMMATE_CARDS.title": "Позаимствовать методы союзников",
   "MANOSABA_LIN_EVENT_TEAM_CARD_EXCHANGE_EVENT.pages.INITIAL.options.TEAMMATE_CARDS.description": "Выберите до 3 карт из 8 [blue]необычных[/blue] и [gold]редких[/gold] карт случайного персонажа-союзника, чтобы добавить в колоду",
   "MANOSABA_LIN_EVENT_TEAM_CARD_EXCHANGE_EVENT.pages.INITIAL.options.TEAMMATE_CARDS_LOCKED.title": "Позаимствовать методы союзников (недоступно)",
-  "MANOSABA_LIN_EVENT_TEAM_CARD_EXCHANGE_EVENT.pages.INITIAL.options.TEAMMATE_CARDS_LOCKED.description": "Требуется как минимум один игрок за [color=#CC6666]Хиро[/color], [color=#ff99cc]Эму[/color] или [color=33ccff]Шерри[/color] в отряде и как минимум один игрок за другого персонажа",
+  "MANOSABA_LIN_EVENT_TEAM_CARD_EXCHANGE_EVENT.pages.INITIAL.options.TEAMMATE_CARDS_LOCKED.description": "Требуется как минимум один игрок за [color=#CC6666]Хиро[/color], [color=#ff99cc]Эму[/color], [color=33ccff]Шерри[/color], [color=#6666cc]Нацумэ Анан[/color] или [color=#aa66cc]Глицинию Арису[/color] в отряде и как минимум один игрок за другого персонажа",
   "MANOSABA_LIN_EVENT_TEAM_CARD_EXCHANGE_EVENT.pages.OWN_CARDS.selectionScreenPrompt": "Выберите до 3 карт своего персонажа",
   "MANOSABA_LIN_EVENT_TEAM_CARD_EXCHANGE_EVENT.pages.TEAMMATE_CARDS.selectionScreenPrompt": "Выберите до 3 карт случайного персонажа-союзника",
   "MANOSABA_LIN_EVENT_TEAM_CARD_EXCHANGE_EVENT.pages.OWN_CARDS.description": "[b]Вы вернулись к своим заметкам и оставили то, что стоит забрать с собой[/b]",

@@ -1,4 +1,5 @@
 using ManosabaLin.Characters.Ananlin.Powers;
+using ManosabaLin.Characters.Ananlin.Relics;
 
 namespace ManosabaLin.Characters.Ananlin.Cards;
 
@@ -61,8 +62,7 @@ public sealed class AnanlinFullTextReplace()
         var rewriteCount = exhausted / rewriteStep;
 
         for (var i = 0; i < rewriteCount; i++)
-            if (this.Sketchbook() is { } sketchbook)
-                await sketchbook.TriggerSilenceRewrite(choiceContext);
+            await AnanlinSilenceIntentManager.ForceBrainwash(choiceContext, Owner);
 
         var pageCount = exhausted / DynamicVars["CardsPerBlankPage"].IntValue;
         for (var i = 0; i < pageCount; i++)

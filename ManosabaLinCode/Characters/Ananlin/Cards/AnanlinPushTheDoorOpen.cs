@@ -39,14 +39,17 @@ public sealed class AnanlinPushTheDoorOpen()
             .Execute(choiceContext);
 
         if (peace <= 0 || CombatState is not { } combatState) return;
-        if (await this.LosePeaceOfMind(choiceContext) <= 0) return;
 
-        await DamageCmd.Attack(damage)
-            .WithHitCount(DynamicVars["Hits"].IntValue)
-            .FromCard(this, cardPlay)
-            .TargetingAllOpponents(combatState)
-            .WithHitFx("vfx/vfx_attack_blunt")
-            .Execute(choiceContext);
+        var lost = await this.LosePeaceOfMind(choiceContext, 2);
+        for (var i = 0; i < lost; i++)
+        {
+            await DamageCmd.Attack(damage)
+                .WithHitCount(DynamicVars["Hits"].IntValue)
+                .FromCard(this, cardPlay)
+                .TargetingAllOpponents(combatState)
+                .WithHitFx("vfx/vfx_attack_blunt")
+                .Execute(choiceContext);
+        }
     }
 
     protected override void OnUpgrade(ComponentContext componentContext)

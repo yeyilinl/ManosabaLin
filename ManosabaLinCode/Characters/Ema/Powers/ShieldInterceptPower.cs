@@ -46,21 +46,49 @@ public class ShieldInterceptPower : ManosabaPowerTemplate
 
         Flash();
 
-        // 给掩护列表中的队友加格挡
-        foreach (var covered in _coveredCreatures)
+        try
         {
-            if (covered is { IsAlive: true })
-                await CreatureCmd.GainBlock(covered, _totalDamageTaken, ValueProp.Move, null);
-        }
+            // 给掩护列表中的队友加格挡
+            foreach (var covered in _coveredCreatures)
+            {
+                if (covered is { IsAlive: true })
+                {
+                    try
+                    {
+                        await CreatureCmd.GainBlock(covered, _totalDamageTaken, ValueProp.Move, null);
+                    }
+                    catch (Exception ex)
+                    {
+                        MainFile.Logger.Info($"[ShieldInterceptPower] Failed to grant block to covered creature: {ex.Message}");
+                    }
+                }
+            }
 
-        // 羁绊偏亲密时自己也获得格挡
-        var bond = Owner.GetPower<BondPower>();
-        if (bond != null && bond.Affinity > bond.Estrangement)
+            // 羁绊偏亲密时自己也获得格挡
+            var bond = Owner.GetPower<BondPower>();
+            if (bond != null && bond.Affinity > bond.Estrangement)
+            {
+                try
+                {
+                    await CreatureCmd.GainBlock(Owner, _totalDamageTaken, ValueProp.Move, null);
+                }
+                catch (Exception ex)
+                {
+                    MainFile.Logger.Info($"[ShieldInterceptPower] Failed to grant self block: {ex.Message}");
+                }
+            }
+        }
+        finally
         {
-            await CreatureCmd.GainBlock(Owner, _totalDamageTaken, ValueProp.Move, null);
+            _totalDamageTaken = 0;
+            try
+            {
+                await PowerCmd.Remove(this);
+            }
+            catch (Exception ex)
+            {
+                MainFile.Logger.Info($"[ShieldInterceptPower] Failed to remove power: {ex.Message}");
+            }
         }
-
-        _totalDamageTaken = 0;
-        await PowerCmd.Remove(this);
     }
 }

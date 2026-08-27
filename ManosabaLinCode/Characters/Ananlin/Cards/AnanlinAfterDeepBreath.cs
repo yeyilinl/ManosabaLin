@@ -40,7 +40,7 @@ public sealed class AnanlinAfterDeepBreath()
             .WithHitFx("vfx/vfx_attack_blunt")
             .Execute(choiceContext);
 
-        var extraPlays = Math.Min(AnanlinPeaceOfMindPower.MaxStacks, lost) - 1;
+        var extraPlays = Math.Max(0, lost - 2);
         if (extraPlays > 0)
             PendingExtraPlays += extraPlays;
     }

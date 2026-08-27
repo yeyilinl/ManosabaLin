@@ -1,4 +1,8 @@
+using ManosabaLin.Characters.Yalisalin.Capabilities;
+using ManosabaLin.Characters.Yalisalin.Components;
+using ManosabaLin.Characters.Yalisalin.Powers;
 using ManosabaLin.Characters.Yalisalin.Relics;
+using STS2RitsuLib.Models.Capabilities;
 
 namespace ManosabaLin.Characters.Yalisalin.Cards;
 
@@ -11,14 +15,22 @@ public sealed class Reversecalculation()
         var target = cardPlay.Target;
         ArgumentNullException.ThrowIfNull(target);
 
-        if (YalisalinFireColorSystem.TryGetHairpin(Owner, out var hairpin)
-            && hairpin.TryDowngradeFireColor(target, out var color, this))
-            hairpin.GrantSealedFire(color);
+        if (!YalisalinFireColorSystem.TryGetHairpin(Owner, out var hairpin))
+            return;
 
         if (IsUpgraded)
-            await YalisalinFireColorSystem.ConsumeFireColor(choiceContext, Owner, target, 1, this);
+        {
+            foreach (var color in hairpin.SealEarliestDistinctFireColors(target, 2))
+                await YalisalinFireColorSystem.ResolveExtraFireColorReward(choiceContext, Owner, color, this);
+            await YalisalinSealedFirePower.Sync(choiceContext, Owner, this);
+            return;
+        }
 
-        YalisalinFireColorCardHelpers.ApplyHeat(Owner, target, this);
+        if (hairpin.TrySealEarliestFireColor(target, out var sealedColor))
+        {
+            await YalisalinFireColorSystem.ResolveExtraFireColorReward(choiceContext, Owner, sealedColor, this);
+            await YalisalinSealedFirePower.Sync(choiceContext, Owner, this);
+        }
     }
 }
 
@@ -123,11 +135,7 @@ public sealed class Afterschooltestburn()
 
         await YalisalinFireColorCardHelpers.Attack(choiceContext, cardPlay, this, target, DynamicVars.Damage.BaseValue);
         await YalisalinFireColorSystem.ConsumeFireColor(choiceContext, Owner, target, 1, this);
-
-        if (YalisalinFireColorSystem.TryGetHairpin(Owner, out var hairpin)
-            && hairpin.TargetHasFireColor(target)
-            && hairpin.TryDowngradeFireColor(target, out var color, this))
-            await hairpin.ResolveExtraFireColorReward(choiceContext, color, this);
+        YalisalinFireColorCardHelpers.ApplyHeat(Owner, target, this);
     }
 
     protected override void OnUpgrade(ComponentContext componentContext)
@@ -157,11 +165,17 @@ public sealed class Ashinpages()
         if (hairpin.HasAnySealedFire())
         {
             hairpin.TryCopySealedFire();
+            await YalisalinSealedFirePower.Sync(choiceContext, Owner, this);
             return;
         }
 
         if (hairpin.TryGetEarliestFireColor(target, out var color))
+        {
             hairpin.GrantSealedFire(color);
+            await YalisalinSealedFirePower.Sync(choiceContext, Owner, this);
+        }
+
+        YalisalinFireColorCardHelpers.ApplyHeat(Owner, target, this);
     }
 
     protected override void OnUpgrade(ComponentContext componentContext)
@@ -195,15 +209,19 @@ public sealed class Burntthermometerpaper()
         if (hairpin.IsFireColorFull(target))
         {
             await hairpin.ConsumeFireColor(choiceContext, target, DynamicVars["Consume"].IntValue, this);
+            this.SetHeatWord(strong: false);
+            YalisalinFireColorCardHelpers.ApplyHeat(Owner, target, this, strong: false);
         }
         else
         {
             while (!hairpin.IsFireColorFull(target) && hairpin.TryAddFireColor(target, 1, this))
             {
             }
-        }
 
-        YalisalinFireColorCardHelpers.ApplyHeat(Owner, target, this, strong: true);
+            // 补满后升温变为强升温
+            this.SetHeatWord(strong: true);
+            YalisalinFireColorCardHelpers.ApplyHeat(Owner, target, this, strong: true);
+        }
     }
 
     protected override void OnUpgrade(ComponentContext componentContext)
@@ -255,7 +273,7 @@ public sealed class Grazingcritical()
             hairpin.TryAddFireColor(target, 1, this);
         }
 
-        YalisalinFireColorCardHelpers.ApplyHeat(Owner, target, this, hairpin.IsFireColorFull(target));
+        YalisalinFireColorCardHelpers.ApplyHeat(Owner, target, this);
     }
 
     protected override void OnUpgrade(ComponentContext componentContext)
@@ -296,9 +314,8 @@ public sealed class Deadlinehandoff()
             }
 
             await hairpin.ConsumeFireColor(choiceContext, target, consume, this);
+            hairpin.TryConvertFireColor(target, this);
         }
-
-        YalisalinFireColorCardHelpers.ApplyHeat(Owner, target, this);
     }
 
     protected override void OnUpgrade(ComponentContext componentContext)
@@ -323,43 +340,31 @@ public sealed class Temperatureproof()
         var target = cardPlay.Target;
         ArgumentNullException.ThrowIfNull(target);
 
+        await YalisalinFireColorCardHelpers.Attack(choiceContext, cardPlay, this, target, DynamicVars.Damage.BaseValue);
+
         if (!YalisalinFireColorSystem.TryGetHairpin(Owner, out var hairpin))
             return;
 
-        var full = hairpin.IsFireColorFull(target);
-        var fullChanged = false;
-        void TrackFullChange()
+        // 选择1格火色进行封存
+        YalisalinFireColor? sealedColor = null;
+        if (await YalisalinFireColorSegmentPicker.Pick(Owner, target, SelectionScreenPrompt) is { } sealedSegment
+            && hairpin.TrySealFireColorSegment(target, sealedSegment))
         {
-            var now = hairpin.IsFireColorFull(target);
-            if (now == full)
-                return;
-
-            fullChanged = true;
-            full = now;
+            sealedColor = sealedSegment.Color;
+            await YalisalinSealedFirePower.Sync(choiceContext, Owner, this);
         }
 
-        await YalisalinFireColorCardHelpers.Attack(choiceContext, cardPlay, this, target, DynamicVars.Damage.BaseValue);
-        TrackFullChange();
-
-        var downgraded = hairpin.TryDowngradeFireColor(target, out var downgradedColor, this);
-        TrackFullChange();
-
         var consumed = await hairpin.ConsumeFireColorDetailed(choiceContext, target, 1, this);
-        TrackFullChange();
-
-        if (downgraded
+        if (sealedColor != null
             && consumed.Consumed.Count > 0
-            && downgradedColor != consumed.Consumed.Last().Color)
+            && sealedColor.Value != consumed.Consumed.Last().Color)
         {
             hairpin.TryAddFireColor(target, 1, this);
-            TrackFullChange();
         }
 
         await CardPileCmd.Draw(choiceContext, DynamicVars.Cards.IntValue, Owner);
         if (IsUpgraded)
             await PlayerCmd.GainEnergy(DynamicVars.Energy.IntValue, Owner);
-
-        YalisalinFireColorCardHelpers.ApplyHeat(Owner, target, this, fullChanged);
     }
 }
 
@@ -404,8 +409,9 @@ public sealed class Samewrongproblem()
             return;
         }
 
-        if (hairpin.TryDowngradeFireColor(target, out _, this))
-            await CardPileCmd.Draw(choiceContext, DynamicVars.Cards.IntValue, Owner);
+        // 否则将升温改为强升温
+        hairpin.TryStrongConvertFireColor(target, this);
+        await CardPileCmd.Draw(choiceContext, DynamicVars.Cards.IntValue, Owner);
     }
 
     protected override void OnUpgrade(ComponentContext componentContext)
@@ -474,7 +480,7 @@ public sealed class Thirteenthlistener()
 
 [RegisterCard(typeof(YalisalinCardPool))]
 public sealed class Pocketmatchbox()
-    : ManosabaCardTemplate(0, CardType.Skill, CardRarity.Common, TargetType.AnyEnemy)
+    : ManosabaCardTemplate(1, CardType.Skill, CardRarity.Common, TargetType.AnyEnemy)
 {
     public override bool GainsBlock => true;
 
@@ -488,9 +494,20 @@ public sealed class Pocketmatchbox()
         if (!YalisalinFireColorSystem.TryGetHairpin(Owner, out var hairpin))
             return;
 
-        if (hairpin.TryMoveLastFireColorToFront(target, out var movedColor, this)
-            && (!hairpin.TryGetLastConsumedFireColorThisTurn(out var last) || last != movedColor))
+        // 选择1格火色进行封存
+        if (await YalisalinFireColorSegmentPicker.Pick(Owner, target, SelectionScreenPrompt) is not { } sealedSegment
+            || !hairpin.TrySealFireColorSegment(target, sealedSegment))
+            return;
+
+        if (!hairpin.TryGetLastConsumedFireColorThisTurn(out var last) || last != sealedSegment.Color)
+        {
             await CardPileCmd.Draw(choiceContext, DynamicVars.Cards.IntValue, Owner);
+            hairpin.TryStrongConvertFireColor(target, this);
+        }
+        else
+        {
+            hairpin.TryConvertFireColor(target, this);
+        }
 
         if (IsUpgraded)
             await CreatureCmd.GainBlock(Owner.Creature, DynamicVars.Block, cardPlay);
@@ -522,5 +539,11 @@ internal static class YalisalinFireColorCardHelpers
         }
 
         YalisalinFireColorSystem.TryConvertFireColor(owner, target, source);
+    }
+
+    public static void SetHeatWord(this CardModel card, bool strong)
+    {
+        if (card.TryGetCapability<YalisalinHeatWordCapability>(out var heat))
+            heat.SetStrongHeat(strong);
     }
 }

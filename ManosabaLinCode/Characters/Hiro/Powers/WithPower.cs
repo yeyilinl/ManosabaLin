@@ -1,16 +1,19 @@
 using ManosabaLin.Characters.Common;
 using ManosabaLin.Characters.Ananlin.Cards;
 using ManosabaLin.Characters.Ema.Powers;
+using ManosabaLin.Characters.Ema.Vfx;
 using ManosabaLin.Characters.Hiro.Cards;
 using ManosabaLin.Characters.Sherrylin.Cards;
 using ManosabaLin.Characters.Ema.Cards;
 using ManosabaLin.Characters.Emalin;
+using MegaCrit.Sts2.Core.Assets;
 using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Entities.Powers;
 using MegaCrit.Sts2.Core.GameActions.Multiplayer;
+using MegaCrit.Sts2.Core.Helpers;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.ValueProps;
 using STS2RitsuLib.Interop.AutoRegistration;
@@ -118,6 +121,59 @@ public sealed class WithPower : ManosabaPowerTemplate
     {
         if (power != this) return;
         await CheckAndGiveCharacterReward();
+
+        // 艾玛（Emalin）魔女化满 100：挂上额外翅膀特效。
+        // 层数回落 < 100 不移除，只有能力被移除（战斗结束）才清理，
+        // 从而保证每个战斗房间独立重置。
+        if (Amount >= 100 && Owner?.Player?.Character is Emalin.Emalin)
+            EnsureWings();
+    }
+
+    public override async Task AfterRemoved(Creature oldOwner)
+    {
+        await base.AfterRemoved(oldOwner);
+        RemoveWings(oldOwner);
+    }
+
+    /// <summary>翅膀特效场景路径（自 MonosabaVfx 迁入）。</summary>
+    private const string WingScenePath = "res://ManosabaLin/scenes/Emalin/ema_wing.tscn";
+
+    /// <summary>翅膀节点名，用于查找/清理。</summary>
+    private const string WingNodeName = "EmaWitchWingsVfx";
+
+    /// <summary>把翅膀特效挂到 Owner 的 BackVfxContainer（画在所有角色立绘后面的官方容器）。</summary>
+    private void EnsureWings()
+    {
+        if (Owner == null) return;
+        var container = Owner.GetBackVfxContainer();
+        if (container == null) return;
+
+        if (container.GetNodeOrNull<EmaFormVfx>(WingNodeName) != null) return;
+
+        var scene = PreloadManager.Cache.GetScene(WingScenePath);
+        if (scene == null)
+        {
+            MainFile.Logger.Warn($"[WithPower] 翅膀场景未找到: {WingScenePath}");
+            return;
+        }
+
+        var vfx = scene.Instantiate<EmaFormVfx>();
+        if (vfx == null) return;
+
+        vfx.Name = WingNodeName;
+        vfx.Target = Owner;
+        container.AddChildSafely(vfx);
+        MainFile.Logger.Info("[WithPower] 艾玛魔女化满 100，翅膀特效已挂载到 BackVfxContainer");
+    }
+
+    /// <summary>从指定生物身上移除翅膀特效（能力移除/战斗结束时调用）。</summary>
+    private static void RemoveWings(Creature owner)
+    {
+        if (owner == null) return;
+        var container = owner.GetBackVfxContainer();
+        if (container == null) return;
+
+        container.GetNodeOrNull<EmaFormVfx>(WingNodeName)?.QueueFreeSafely();
     }
 
     private async Task CheckAndGiveCharacterReward()
