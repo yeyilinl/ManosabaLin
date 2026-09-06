@@ -1,5 +1,4 @@
-using System.Collections.Generic;
-using System.Linq;
+﻿using System.Linq;
 using System.Threading.Tasks;
 
 namespace ManosabaLin.Characters.Common.AncientCurses;
@@ -11,6 +10,7 @@ namespace ManosabaLin.Characters.Common.AncientCurses;
 [RegisterCard(typeof(LinCardPool))]
 public sealed class MiliaLost : LinAncientCurseCard
 {
+
     protected override async Task AfterCardDrawn(
         PlayerChoiceContext choiceContext,
         CardModel card,

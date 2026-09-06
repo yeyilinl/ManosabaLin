@@ -1,6 +1,9 @@
 using ManosabaLin.Characters.Common.Components.Abstracts;
 using ManosabaLin.Characters.Common.AncientCurses;
+using ManosabaLin.Characters.Common.AncientCurses.Powers;
+using ManosabaLin.Characters.Common.Powers;
 using ManosabaLin.Characters.Hiro.Cards;
+using TempStrength = ManosabaLin.Characters.Common.Powers.TempStrength;
 using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.HoverTips;
 using MegaCrit.Sts2.Core.Localization;
@@ -10,22 +13,54 @@ using System.Threading.Tasks;
 
 namespace ManosabaLin.Characters.Common.Components;
 
-/// <summary>
-/// 组件「原罪」：由其他卡牌运行时 <see cref="AddComponent"/> 添加到目标诅咒卡上，
-/// 不是诅咒卡的 CanonicalComponents（卡牌自带）。挂上后：
-/// 1. 卡面描述区顶部显示「原罪」（prefix 本地化）；
-/// 2. 悬浮提示按宿主卡类型分发到对应的本地化键（一张卡一个键），
-///    描述该卡「宽恕」（保留）/「自惩」（打出）的具体效果；
-/// 3. 回合结束自动临时保留（<see cref="GiveSingleTurnRetain"/>，不添加保留关键词）；
-/// 4. 「宽恕」：被保留的下一回合开始卡仍返回手牌时触发（按宿主卡分发）；
-/// 5. 「自惩」：打出时触发（按宿主卡分发）。
-/// 数值类效果通过修改卡自身 DynamicVar 的 BaseValue 实现，卡面文字引用同名变量自动同步。
-/// </summary>
 public sealed partial class Originalsin : KeywordLikeComponent
 {
     private const string HoverTipTitleKey = "ManosabaLin.Originalsin.hovertip.title";
     private const string HiroparanoidTipKey = "ManosabaLin.Originalsin.Hiroparanoid.hovertip.description";
     private const string MargeCharmTipKey = "ManosabaLin.Originalsin.MargeCharm.hovertip.description";
+    private const string MeruruCowardiceTipKey = "ManosabaLin.Originalsin.MeruruCowardice.hovertip.description";
+    private const string NoahEnsnareTipKey = "ManosabaLin.Originalsin.NoahEnsnare.hovertip.description";
+    private const string NayukaJealousyTipKey = "ManosabaLin.Originalsin.NayukaJealousy.hovertip.description";
+    private const string SherryVoidTipKey = "ManosabaLin.Originalsin.SherryVoid.hovertip.description";
+    private const string RaiyaMadnessTipKey = "ManosabaLin.Originalsin.RaiyaMadness.hovertip.description";
+    private const string AnanlinVanityTipKey = "ManosabaLin.Originalsin.AnanlinVanity.hovertip.description";
+    private const string EmaregretTipKey = "ManosabaLin.Originalsin.Emaregret.hovertip.description";
+    private const string HannadelusionTipKey = "ManosabaLin.Originalsin.Hannadelusion.hovertip.description";
+    private const string CocoworryTipKey = "ManosabaLin.Originalsin.Cocoworry.hovertip.description";
+    private const string ArisaGuiltTipKey = "ManosabaLin.Originalsin.ArisaGuilt.hovertip.description";
+    private const string MiliaLostTipKey = "ManosabaLin.Originalsin.MiliaLost.hovertip.description";
+
+    private const string HiroparanoidPrefixKey = "ManosabaLin.Originalsin.Hiroparanoid.prefix";
+    private const string MargeCharmPrefixKey = "ManosabaLin.Originalsin.MargeCharm.prefix";
+    private const string MeruruCowardicePrefixKey = "ManosabaLin.Originalsin.MeruruCowardice.prefix";
+    private const string NoahEnsnarePrefixKey = "ManosabaLin.Originalsin.NoahEnsnare.prefix";
+    private const string NayukaJealousyPrefixKey = "ManosabaLin.Originalsin.NayukaJealousy.prefix";
+    private const string SherryVoidPrefixKey = "ManosabaLin.Originalsin.SherryVoid.prefix";
+    private const string RaiyaMadnessPrefixKey = "ManosabaLin.Originalsin.RaiyaMadness.prefix";
+    private const string AnanlinVanityPrefixKey = "ManosabaLin.Originalsin.AnanlinVanity.prefix";
+    private const string EmaregretPrefixKey = "ManosabaLin.Originalsin.Emaregret.prefix";
+    private const string HannadelusionPrefixKey = "ManosabaLin.Originalsin.Hannadelusion.prefix";
+    private const string CocoworryPrefixKey = "ManosabaLin.Originalsin.Cocoworry.prefix";
+    private const string ArisaGuiltPrefixKey = "ManosabaLin.Originalsin.ArisaGuilt.prefix";
+    private const string MiliaLostPrefixKey = "ManosabaLin.Originalsin.MiliaLost.prefix";
+
+    protected override LocString PrefixLocString => Card switch
+    {
+        Hiroparanoid => new LocString("cards", HiroparanoidPrefixKey),
+        MargeCharm => new LocString("cards", MargeCharmPrefixKey),
+        MeruruCowardice => new LocString("cards", MeruruCowardicePrefixKey),
+        NoahEnsnare => new LocString("cards", NoahEnsnarePrefixKey),
+        NayukaJealousy => new LocString("cards", NayukaJealousyPrefixKey),
+        SherryVoid => new LocString("cards", SherryVoidPrefixKey),
+        RaiyaMadness => new LocString("cards", RaiyaMadnessPrefixKey),
+        AnanlinVanity => new LocString("cards", AnanlinVanityPrefixKey),
+        Emaregret => new LocString("cards", EmaregretPrefixKey),
+        Hannadelusion => new LocString("cards", HannadelusionPrefixKey),
+        Cocoworry => new LocString("cards", CocoworryPrefixKey),
+        ArisaGuilt => new LocString("cards", ArisaGuiltPrefixKey),
+        MiliaLost => new LocString("cards", MiliaLostPrefixKey),
+        _ => base.PrefixLocString,
+    };
 
     public override IEnumerable<IHoverTip> HoverTips
     {
@@ -35,6 +70,17 @@ public sealed partial class Originalsin : KeywordLikeComponent
             {
                 Hiroparanoid => HiroparanoidTipKey,
                 MargeCharm => MargeCharmTipKey,
+                MeruruCowardice => MeruruCowardiceTipKey,
+                NoahEnsnare => NoahEnsnareTipKey,
+                NayukaJealousy => NayukaJealousyTipKey,
+                SherryVoid => SherryVoidTipKey,
+                RaiyaMadness => RaiyaMadnessTipKey,
+                AnanlinVanity => AnanlinVanityTipKey,
+                Emaregret => EmaregretTipKey,
+                Hannadelusion => HannadelusionTipKey,
+                Cocoworry => CocoworryTipKey,
+                ArisaGuilt => ArisaGuiltTipKey,
+                MiliaLost => MiliaLostTipKey,
                 _ => null,
             };
             if (descriptionKey == null) yield break;
@@ -44,7 +90,6 @@ public sealed partial class Originalsin : KeywordLikeComponent
         }
     }
 
-    // ── 回合结束：临时保留（不添加 Retain 关键词）──
     public override Task BeforeSideTurnEndPostfix(
         PlayerChoiceContext choiceContext,
         CombatSide side,
@@ -58,7 +103,6 @@ public sealed partial class Originalsin : KeywordLikeComponent
         return Task.CompletedTask;
     }
 
-    // ── 宽恕：保留后的下一回合开始卡仍在手牌 ──
     public override async Task AfterPlayerTurnStartEarlyPostfix(
         PlayerChoiceContext choiceContext,
         Player player,
@@ -66,6 +110,34 @@ public sealed partial class Originalsin : KeywordLikeComponent
     {
         if (Card?.Owner != player) return;
         if (Card.Pile?.Type != PileType.Hand) return;
+
+        await Forgive(choiceContext);
+    }
+
+    public override async Task OnPlayPostfix(
+        PlayerChoiceContext choiceContext,
+        CardPlay cardPlay,
+        ComponentContext componentContext)
+    {
+        await Punish(choiceContext);
+    }
+
+    /// <summary>
+    /// 任意原罪触发「自惩」后触发（含被打出自惩与卡牌主动触发的免费自惩）。
+    /// </summary>
+    public static event Action<PlayerChoiceContext, CardModel>? PunishTriggered;
+
+    /// <summary>
+    /// 立刻触发一次本组件的「宽恕」效果，并计入本场宽恕次数。
+    /// </summary>
+    public async Task Forgive(PlayerChoiceContext choiceContext)
+    {
+        var owner = Card?.Owner;
+        if (owner != null)
+        {
+            await PowerCmd.Apply<OriginalsinForgivenessCounterPower>(
+                choiceContext, owner.Creature, 1m, owner.Creature, Card, false);
+        }
 
         switch (Card)
         {
@@ -75,14 +147,46 @@ public sealed partial class Originalsin : KeywordLikeComponent
             case MargeCharm:
                 await ForgiveMargeCharm(choiceContext);
                 break;
+            case MeruruCowardice:
+                await ForgiveMeruruCowardice(choiceContext);
+                break;
+            case NoahEnsnare:
+                await ForgiveNoahEnsnare(choiceContext);
+                break;
+            case NayukaJealousy:
+                await ForgiveNayukaJealousy(choiceContext);
+                break;
+            case SherryVoid:
+                await ForgiveSherryVoid(choiceContext);
+                break;
+            case RaiyaMadness:
+                await ForgiveRaiyaMadness(choiceContext);
+                break;
+            case AnanlinVanity:
+                await ForgiveAnanlinVanity(choiceContext);
+                break;
+            case Emaregret:
+                await ForgiveEmaregret(choiceContext);
+                break;
+            case Hannadelusion:
+                await ForgiveHannadelusion(choiceContext);
+                break;
+            case Cocoworry:
+                await ForgiveCocoworry(choiceContext);
+                break;
+            case ArisaGuilt:
+                await ForgiveArisaGuilt(choiceContext);
+                break;
+            case MiliaLost:
+                await ForgiveMiliaLost(choiceContext);
+                break;
         }
     }
 
-    // ── 自惩：打出时 ──
-    public override async Task OnPlayPostfix(
-        PlayerChoiceContext choiceContext,
-        CardPlay cardPlay,
-        ComponentContext componentContext)
+    /// <summary>
+    /// 立刻触发一次本组件的「自惩」效果，并广播自惩触发事件。
+    /// </summary>
+    public async Task Punish(PlayerChoiceContext choiceContext)
     {
         switch (Card)
         {
@@ -92,11 +196,45 @@ public sealed partial class Originalsin : KeywordLikeComponent
             case MargeCharm:
                 await PunishMargeCharm(choiceContext);
                 break;
+            case MeruruCowardice:
+                await PunishMeruruCowardice(choiceContext);
+                break;
+            case NoahEnsnare:
+                await PunishNoahEnsnare(choiceContext);
+                break;
+            case NayukaJealousy:
+                await PunishNayukaJealousy(choiceContext);
+                break;
+            case SherryVoid:
+                await PunishSherryVoid(choiceContext);
+                break;
+            case RaiyaMadness:
+                await PunishRaiyaMadness(choiceContext);
+                break;
+            case AnanlinVanity:
+                await PunishAnanlinVanity(choiceContext);
+                break;
+            case Emaregret:
+                await PunishEmaregret(choiceContext);
+                break;
+            case Hannadelusion:
+                await PunishHannadelusion(choiceContext);
+                break;
+            case Cocoworry:
+                await PunishCocoworry(choiceContext);
+                break;
+            case ArisaGuilt:
+                await PunishArisaGuilt(choiceContext);
+                break;
+            case MiliaLost:
+                await PunishMiliaLost(choiceContext);
+                break;
         }
+
+        if (Card != null)
+            PunishTriggered?.Invoke(choiceContext, Card);
     }
 
-    // ── 二阶堂希罗的偏执：宽恕 ──
-    // 获得1层下回合开始获得1点能量，并使丢弃牌的数量加1
     private async Task ForgiveHiroparanoid(PlayerChoiceContext choiceContext)
     {
         var card = Card!;
@@ -108,8 +246,6 @@ public sealed partial class Originalsin : KeywordLikeComponent
         card.DynamicVars["DiscardCount"].BaseValue += 1m;
     }
 
-    // ── 二阶堂希罗的偏执：自惩 ──
-    // 抽取1张卡牌，选择消耗1张手卡
     private async Task PunishHiroparanoid(PlayerChoiceContext choiceContext)
     {
         var card = Card!;
@@ -129,8 +265,6 @@ public sealed partial class Originalsin : KeywordLikeComponent
             await CardCmd.Exhaust(choiceContext, selected);
     }
 
-    // ── 宝生玛格的惑情：宽恕 ──
-    // 概率增加5%，使随机敌人获得等于你再生或覆甲的一半的再生或覆甲
     private async Task ForgiveMargeCharm(PlayerChoiceContext choiceContext)
     {
         var card = Card!;
@@ -163,8 +297,6 @@ public sealed partial class Originalsin : KeywordLikeComponent
             await PowerCmd.Apply<PlatingPower>(choiceContext, target, Half(plating), me, card);
     }
 
-    // ── 宝生玛格的惑情：自惩 ──
-    // 获得等于敌人再生或覆甲的一半再生或覆甲，失去等量血量
     private async Task PunishMargeCharm(PlayerChoiceContext choiceContext)
     {
         var card = Card!;
@@ -203,6 +335,504 @@ public sealed partial class Originalsin : KeywordLikeComponent
             ValueProp.Unblockable | ValueProp.Unpowered | ValueProp.Move,
             card,
             null);
+    }
+
+    private async Task ForgiveMeruruCowardice(PlayerChoiceContext choiceContext)
+    {
+        var card = Card!;
+        var owner = card.Owner!;
+        var me = owner.Creature;
+
+        if (card.DynamicVars.TryGetValue("Penalty", out var penalty))
+            penalty.BaseValue = Math.Max(0m, penalty.BaseValue - 1m);
+
+        if (me.GetPower<OriginalsinMeruruBlockTracker>() is null)
+            await PowerCmd.Apply<OriginalsinMeruruBlockTracker>(choiceContext, me, 1m, me, card);
+
+        var tracker = me.GetPower<OriginalsinMeruruBlockTracker>();
+        var dmg = tracker?.LastTurnGained ?? 0m;
+        if (dmg <= 0m) return;
+
+        var combatState = me.CombatState;
+        if (combatState == null) return;
+        var enemies = combatState.Enemies.Where(c => c.IsAlive).ToList();
+        if (enemies.Count == 0) return;
+
+        var rng = owner.RunState.Rng.CombatCardGeneration;
+        var enemy = rng.NextItem(enemies);
+        if (enemy == null) return;
+
+        await CreatureCmd.Damage(
+            choiceContext,
+            enemy,
+            dmg,
+            ValueProp.Unpowered | ValueProp.Move,
+            card,
+            null);
+    }
+
+    private async Task PunishMeruruCowardice(PlayerChoiceContext choiceContext)
+    {
+        var card = Card!;
+        var owner = card.Owner!;
+        var me = owner.Creature;
+
+        var lost = Math.Min(15m, me.Block);
+        if (lost > 0m)
+            await CreatureCmd.LoseBlock(choiceContext, me, lost, me);
+
+        if (lost <= 0m) return;
+        var combatState = me.CombatState;
+        if (combatState == null) return;
+
+        var allies = combatState.Allies.Where(c => c.IsAlive).ToList();
+        if (allies.Count == 0) return;
+
+        var rng = owner.RunState.Rng.CombatCardGeneration;
+        var ally = rng.NextItem(allies);
+        if (ally == null) return;
+
+        await CreatureCmd.Heal(ally, lost);
+    }
+
+    private async Task ForgiveNoahEnsnare(PlayerChoiceContext choiceContext)
+    {
+        var card = Card!;
+        var owner = card.Owner!;
+        var rng = owner.RunState.Rng.CombatCardGeneration;
+
+        if (rng.NextFloat() < 0.5f)
+            await CardPileCmd.Add(card, PileType.Discard, CardPilePosition.Random);
+        else
+            await CardCmd.Exhaust(choiceContext, card);
+
+        if (card.DynamicVars.TryGetValue("PaintCount", out var paintCount))
+            paintCount.BaseValue += 1m;
+
+        var paints = PileType.Hand.GetPile(owner).Cards.OfType<SelfControlledPaint>()
+            .Concat(PileType.Draw.GetPile(owner).Cards.OfType<SelfControlledPaint>())
+            .Concat(PileType.Discard.GetPile(owner).Cards.OfType<SelfControlledPaint>())
+            .Count();
+
+        if (paints > 0)
+            await PowerCmd.Apply<StrengthPower>(choiceContext, owner.Creature, paints, owner.Creature, card);
+    }
+
+    private async Task PunishNoahEnsnare(PlayerChoiceContext choiceContext)
+    {
+        var card = Card!;
+        var owner = card.Owner!;
+        if (owner.Creature.CombatState is not { } combatState) return;
+
+        var allies = combatState.Players.Where(p => p.Creature.IsAlive).ToList();
+        if (allies.Count == 0) return;
+
+        var rng = owner.RunState.Rng.CombatCardGeneration;
+        var ally = rng.NextItem(allies);
+        if (ally == null) return;
+
+        var paint = combatState.CreateCard<SelfControlledPaint>(ally);
+        await CardPileCmd.AddGeneratedCardToCombat(paint, PileType.Draw, ally, CardPilePosition.Random);
+        await PowerCmd.Apply<EnergyNextTurnPower>(choiceContext, ally.Creature, 2m, owner.Creature, card);
+    }
+
+    private async Task ForgiveNayukaJealousy(PlayerChoiceContext choiceContext)
+    {
+        var card = Card!;
+        var owner = card.Owner!;
+
+        card.DynamicVars["Chance"].BaseValue += 5m;
+
+        var discard = PileType.Discard.GetPile(owner).Cards.ToList();
+        var n = discard.Count;
+        if (n <= 0) return;
+
+        var pool = PileType.Draw.GetPile(owner).Cards
+            .Concat(PileType.Hand.GetPile(owner).Cards)
+            .Concat(PileType.Discard.GetPile(owner).Cards)
+            .Where(c => c.Pile?.Type != PileType.Exhaust)
+            .ToList();
+        if (pool.Count == 0) return;
+
+        var rng = owner.RunState.Rng.CombatCardGeneration;
+        var count = Math.Min(n, pool.Count);
+        for (var i = 0; i < count; i++)
+        {
+            if (pool.Count == 0) break;
+            var pick = rng.NextItem(pool);
+            if (pick == null) break;
+            pool.Remove(pick);
+            await CardPileCmd.Add(pick, PileType.Exhaust, CardPilePosition.Random);
+        }
+    }
+
+    private async Task PunishNayukaJealousy(PlayerChoiceContext choiceContext)
+    {
+        var card = Card!;
+        var owner = card.Owner!;
+        var n = PileType.Discard.GetPile(owner).Cards.Count;
+        if (n <= 0) return;
+
+        var rng = owner.RunState.Rng.CombatCardGeneration;
+        for (var i = 0; i < n; i++)
+        {
+            if (rng.NextFloat() >= 0.1f) continue;
+
+            var drawPile = PileType.Draw.GetPile(owner);
+            var exhaustPile = PileType.Exhaust.GetPile(owner);
+            if (drawPile.Cards.Count == 0 || exhaustPile.Cards.Count == 0) continue;
+
+            var fromDraw = (await CardSelectCmd.FromCombatPile(
+                choiceContext,
+                drawPile,
+                owner,
+                new CardSelectorPrefs(CardSelectorPrefs.DiscardSelectionPrompt, 1, 1))).FirstOrDefault();
+            if (fromDraw == null) continue;
+
+            var fromExhaust = (await CardSelectCmd.FromCombatPile(
+                choiceContext,
+                exhaustPile,
+                owner,
+                new CardSelectorPrefs(CardSelectorPrefs.DiscardSelectionPrompt, 1, 1))).FirstOrDefault();
+            if (fromExhaust == null) continue;
+
+            await CardPileCmd.Add(fromDraw, PileType.Exhaust, CardPilePosition.Random);
+            await CardPileCmd.Add(fromExhaust, PileType.Draw, CardPilePosition.Random);
+        }
+    }
+
+    private async Task ForgiveSherryVoid(PlayerChoiceContext choiceContext)
+    {
+        var card = Card!;
+        var owner = card.Owner!;
+
+        card.DynamicVars["Threshold"].BaseValue += 15m;
+        await PowerCmd.Apply<OriginalsinSherryShareTempStrengthPower>(
+            choiceContext, owner.Creature, 1m, owner.Creature, card);
+    }
+
+    private async Task PunishSherryVoid(PlayerChoiceContext choiceContext)
+    {
+        var card = Card!;
+        var owner = card.Owner!;
+
+        await PowerCmd.Apply<StrengthPower>(choiceContext, owner.Creature, -1m, owner.Creature, card);
+        await PowerCmd.Apply<TempStrength>(choiceContext, owner.Creature, 4m, owner.Creature, card);
+    }
+
+    private async Task ForgiveRaiyaMadness(PlayerChoiceContext choiceContext)
+    {
+        var card = Card!;
+        var owner = card.Owner!;
+
+        card.DynamicVars["WhiffChance"].BaseValue += 5m;
+        card.DynamicVars["ExtraChance"].BaseValue += 5m;
+
+        var extra = owner.Creature.GetPower<OriginalsinRaiyaExtraPower>();
+        if (extra is null)
+            extra = await PowerCmd.Apply<OriginalsinRaiyaExtraPower>(
+                choiceContext, owner.Creature, card.DynamicVars["ExtraChance"].BaseValue, owner.Creature, card);
+        if (card is RaiyaMadness madness)
+            extra?.SyncFromCard(madness);
+    }
+
+    private async Task PunishRaiyaMadness(PlayerChoiceContext choiceContext)
+    {
+        var card = Card!;
+        var owner = card.Owner!;
+
+        card.DynamicVars["WhiffChance"].BaseValue += 5m;
+        card.DynamicVars["ExtraChance"].BaseValue += 5m;
+
+        var extra = owner.Creature.GetPower<OriginalsinRaiyaExtraPower>();
+        if (extra is null)
+            extra = await PowerCmd.Apply<OriginalsinRaiyaExtraPower>(
+                choiceContext, owner.Creature, card.DynamicVars["ExtraChance"].BaseValue, owner.Creature, card);
+        if (extra != null)
+        {
+            extra.ForcedExtra = true;
+            if (card is RaiyaMadness madness)
+                extra.SyncFromCard(madness);
+        }
+    }
+
+    private async Task ForgiveAnanlinVanity(PlayerChoiceContext choiceContext)
+    {
+        var card = Card!;
+        var owner = card.Owner!;
+
+        await CardPileCmd.Add(card, PileType.Draw, CardPilePosition.Random);
+        card.DynamicVars["DrawCount"].BaseValue += 1m;
+        card.DynamicVars["DiscardCount"].BaseValue += 1m;
+    }
+
+    private async Task PunishAnanlinVanity(PlayerChoiceContext choiceContext)
+    {
+        var card = Card!;
+        var owner = card.Owner!;
+        var rng = owner.RunState.Rng.CombatCardGeneration;
+
+        await CardPileCmd.Draw(choiceContext, 3, owner);
+
+        var selectable = PileType.Hand.GetPile(owner).Cards.Where(c => !ReferenceEquals(c, card)).ToList();
+        if (selectable.Count == 0) return;
+
+        var count = Math.Min(2, selectable.Count);
+        var toDiscard = (await CardSelectCmd.FromHand(
+            choiceContext,
+            owner,
+            new CardSelectorPrefs(CardSelectorPrefs.DiscardSelectionPrompt, count, count),
+            c => !ReferenceEquals(c, card),
+            card)).ToList();
+
+        foreach (var c in toDiscard)
+        {
+            var pile = rng.NextFloat() < 0.5f ? PileType.Draw : PileType.Discard;
+            await CardPileCmd.Add(c, pile, CardPilePosition.Random);
+        }
+    }
+
+    private async Task ForgiveEmaregret(PlayerChoiceContext choiceContext)
+    {
+        var card = Card!;
+        var owner = card.Owner!;
+
+        card.DynamicVars["HpLoss"].BaseValue += 1m;
+        await PowerCmd.Apply<OriginalsinEmaregretWitchOnHpLossPower>(
+            choiceContext, owner.Creature, 1m, owner.Creature, card);
+    }
+
+    private async Task PunishEmaregret(PlayerChoiceContext choiceContext)
+    {
+        var card = Card!;
+        var owner = card.Owner!;
+        var me = owner.Creature;
+
+        if (me.GetPower<OriginalsinEmaregretBlockLossPower>() is null)
+            await PowerCmd.Apply<OriginalsinEmaregretBlockLossPower>(choiceContext, me, 1m, me, card);
+
+        var lost = me.GetPower<OriginalsinEmaregretBlockLossPower>()?.LostThisTurn ?? 0m;
+        if (lost <= 0m) return;
+
+        await CreatureCmd.Heal(me, lost);
+
+        var combatState = me.CombatState;
+        if (combatState == null) return;
+        var enemies = combatState.Enemies.Where(c => c.IsAlive).ToList();
+        if (enemies.Count == 0) return;
+
+        var rng = owner.RunState.Rng.CombatCardGeneration;
+        var enemy = rng.NextItem(enemies);
+        if (enemy == null) return;
+
+        await PowerCmd.Apply<EmaWitchFactorPower>(choiceContext, enemy, lost, me, card);
+    }
+
+    private async Task ForgiveHannadelusion(PlayerChoiceContext choiceContext)
+    {
+        var card = Card!;
+        var owner = card.Owner!;
+
+        card.DynamicVars["Chance"].BaseValue += 5m;
+        if (card is Hannadelusion hanna)
+            await hanna.RunGoldChange(owner.RunState.Rng.CombatCardGeneration);
+    }
+
+    private async Task PunishHannadelusion(PlayerChoiceContext choiceContext)
+    {
+        var card = Card!;
+        var owner = card.Owner!;
+        if (card is not Hannadelusion hanna) return;
+
+        var gold = owner.Gold;
+        if (gold <= 0) return;
+
+        await PlayerCmd.LoseGold(gold, owner);
+        var rolls = (int)(gold / 10);
+        var chance = (float)(card.DynamicVars["Chance"].BaseValue / 100m);
+        var rng = owner.RunState.Rng.CombatCardGeneration;
+
+        for (var i = 0; i < rolls; i++)
+        {
+            if (rng.NextFloat() >= chance) continue;
+            await hanna.RunGoldChange(rng);
+        }
+    }
+
+    private async Task ForgiveCocoworry(PlayerChoiceContext choiceContext)
+    {
+        var card = Card!;
+        var owner = card.Owner!;
+        var draw = PileType.Draw.GetPile(owner).Cards.ToList();
+        if (draw.Count == 0) return;
+
+        var rng = owner.RunState.Rng.CombatCardGeneration;
+        var picked = rng.NextItem(draw);
+        if (picked == null) return;
+
+        var rarity = picked.Rarity;
+        await CardPileCmd.Add(card, PileType.Draw, CardPilePosition.Random);
+        await CardPileCmd.Add(picked, PileType.Hand);
+
+        var sameRarity = PileType.Discard.GetPile(owner).Cards.Where(c => c.Rarity == rarity).ToList();
+        if (sameRarity.Count == 0) return;
+
+        var fromDiscard = rng.NextItem(sameRarity);
+        if (fromDiscard == null) return;
+        await CardPileCmd.Add(fromDiscard, PileType.Draw, CardPilePosition.Random);
+    }
+
+    private async Task PunishCocoworry(PlayerChoiceContext choiceContext)
+    {
+        var card = Card!;
+        var owner = card.Owner!;
+        await PlayerCmd.GainEnergy(1m, owner);
+
+        if (owner.Creature.CombatState is not { } combatState) return;
+        var allies = combatState.Players.Where(p => p.Creature.IsAlive).ToList();
+        if (allies.Count == 0) return;
+
+        var ally = await ChooseAllyPlayer(choiceContext, owner, allies);
+        if (ally == null) return;
+
+        var allyHand = PileType.Hand.GetPile(ally).Cards.ToList();
+        if (allyHand.Count == 0) return;
+
+        var maxRarity = allyHand.Max(c => (int)c.Rarity);
+        await GiveRandomRarityCard(combatState, owner, (CardRarity)maxRarity);
+        await GiveRandomRarityCard(combatState, ally, (CardRarity)maxRarity);
+    }
+
+    private async Task ForgiveArisaGuilt(PlayerChoiceContext choiceContext)
+    {
+        var card = Card!;
+        var owner = card.Owner!;
+
+        card.DynamicVars["MagicAmount"].BaseValue += 1m;
+        await PowerCmd.Apply<OriginalsinArisaMagicBurstPower>(
+            choiceContext, owner.Creature, 1m, owner.Creature, card);
+    }
+
+    private async Task PunishArisaGuilt(PlayerChoiceContext choiceContext)
+    {
+        var card = Card!;
+        var owner = card.Owner!;
+        var maxHp = owner.Creature.MaxHp;
+        if (maxHp <= 0) return;
+
+        await PowerCmd.Apply<YlsmPower>(choiceContext, owner.Creature, maxHp, owner.Creature, card);
+        var energy = (int)(maxHp / 10);
+        if (energy > 0)
+            await PlayerCmd.GainEnergy(energy, owner);
+    }
+
+    private async Task ForgiveMiliaLost(PlayerChoiceContext choiceContext)
+    {
+        var card = Card!;
+        var owner = card.Owner!;
+        var canonical = card.CanonicalInstance;
+
+        await CardPileCmd.RemoveFromCombat(card);
+
+        var power = owner.Creature.GetPower<OriginalsinMiliaReturnPower>();
+        if (power is null)
+            power = await PowerCmd.Apply<OriginalsinMiliaReturnPower>(
+                choiceContext, owner.Creature, 1m, owner.Creature, card);
+        power?.Store(canonical);
+    }
+
+    private async Task PunishMiliaLost(PlayerChoiceContext choiceContext)
+    {
+        var card = Card!;
+        var owner = card.Owner!;
+        if (owner.Creature.CombatState is not { } combatState) return;
+
+        var allies = combatState.Players.Where(p => p.Creature.IsAlive && p != owner).ToList();
+        if (allies.Count == 0)
+            allies = combatState.Players.Where(p => p.Creature.IsAlive).ToList();
+        if (allies.Count == 0) return;
+
+        var ally = await ChooseAllyPlayer(choiceContext, owner, allies);
+        if (ally == null) return;
+
+        await CardPileCmd.GiveToAnotherPlayer(card, ally, PileType.Hand);
+
+        var myHand = PileType.Hand.GetPile(owner).Cards.Where(c => !ReferenceEquals(c, card)).ToList();
+        var theirHand = PileType.Hand.GetPile(ally).Cards.Where(c => !ReferenceEquals(c, card)).ToList();
+        if (myHand.Count == 0 || theirHand.Count == 0) return;
+
+        var myPick = (await CardSelectCmd.FromHand(
+            choiceContext,
+            owner,
+            new CardSelectorPrefs(CardSelectorPrefs.DiscardSelectionPrompt, 1, 1),
+            c => !ReferenceEquals(c, card),
+            card)).FirstOrDefault() ?? owner.RunState.Rng.CombatCardGeneration.NextItem(myHand);
+
+        var theirPick = (await CardSelectCmd.FromHand(
+            choiceContext,
+            ally,
+            new CardSelectorPrefs(CardSelectorPrefs.DiscardSelectionPrompt, 1, 1),
+            c => !ReferenceEquals(c, card),
+            card)).FirstOrDefault() ?? owner.RunState.Rng.CombatCardGeneration.NextItem(theirHand);
+
+        if (myPick != null)
+        {
+            var copy = combatState.CreateCard(myPick.CanonicalInstance, ally);
+            copy.AddKeyword(CardKeyword.Ethereal);
+            await CardPileCmd.AddGeneratedCardToCombat(copy, PileType.Hand, ally);
+        }
+
+        if (theirPick != null)
+        {
+            var copy = combatState.CreateCard(theirPick.CanonicalInstance, owner);
+            copy.AddKeyword(CardKeyword.Ethereal);
+            await CardPileCmd.AddGeneratedCardToCombat(copy, PileType.Hand, owner);
+        }
+    }
+
+    private static async Task<Player?> ChooseAllyPlayer(
+        PlayerChoiceContext choiceContext,
+        Player owner,
+        List<Player> allies)
+    {
+        if (allies.Count == 0) return null;
+        if (allies.Count == 1) return allies[0];
+
+        var handCards = allies.SelectMany(p => PileType.Hand.GetPile(p).Cards).ToList();
+        if (handCards.Count > 0)
+        {
+            var selected = (await CardSelectCmd.FromSimpleGrid(
+                choiceContext,
+                handCards,
+                owner,
+                new CardSelectorPrefs(CardSelectorPrefs.DiscardSelectionPrompt, 1, 1))).FirstOrDefault();
+            if (selected?.Owner != null)
+                return selected.Owner;
+        }
+
+        return owner.RunState.Rng.CombatCardGeneration.NextItem(allies);
+    }
+
+    private static async Task GiveRandomRarityCard(ICombatState combatState, Player player, CardRarity rarity)
+    {
+        var pool = player.Character.CardPool
+            .GetUnlockedCards(player.UnlockState, player.RunState.CardMultiplayerConstraint)
+            .Where(c => c.Rarity == rarity && c.CanBeGeneratedInCombat)
+            .ToList();
+        if (pool.Count == 0)
+        {
+            pool = player.UnlockState.CharacterCardPools
+                .SelectMany(p => p.GetUnlockedCards(player.UnlockState, player.RunState.CardMultiplayerConstraint))
+                .Where(c => c.Rarity == rarity && c.CanBeGeneratedInCombat)
+                .ToList();
+        }
+        if (pool.Count == 0) return;
+
+        var template = player.RunState.Rng.CombatCardGeneration.NextItem(pool);
+        if (template == null) return;
+
+        var generated = combatState.CreateCard(template, player);
+        await CardPileCmd.AddGeneratedCardToCombat(generated, PileType.Hand, player);
     }
 
     private static decimal Half(decimal value) => Math.Max(1m, value / 2m);

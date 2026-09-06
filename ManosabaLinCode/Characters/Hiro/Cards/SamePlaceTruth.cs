@@ -67,12 +67,8 @@ public sealed class SamePlaceTruth()
         {
             yield return CardEffectHoverTipFactory.FromCard(this, EffectHoverLocEntry);
 
-            // 右键强化（融合）已触发时，把【霜覆初心】的效果提示也并入本卡悬浮提示面板，
-            // 这样悬停/右键强化时能直接看到右侧拼接卡的效果本地化文本。
             if (SamePlaceTruthFusionState.IsQueued(this))
-            {
                 yield return CardEffectHoverTipFactory.FromCard(this, PendingTruthEffectLocEntry);
-            }
         }
     }
 
@@ -87,17 +83,19 @@ public sealed class SamePlaceTruth()
 
     public bool CanHandleRightClickLocal(RightClickContext context)
     {
-        return Pile?.Type == PileType.Hand && !SamePlaceTruthFusionState.IsQueued(this);
+        return Pile?.Type == PileType.Hand;
     }
 
     public Task OnRightClick(PlayerChoiceContext choiceContext, RightClickContext clickContext)
     {
         if (Pile?.Type != PileType.Hand)
-        {
             return Task.CompletedTask;
-        }
 
-        SamePlaceTruthFusionState.Queue(this);
+        if (SamePlaceTruthFusionState.IsQueued(this))
+            SamePlaceTruthFusionState.Reset(this);
+        else
+            SamePlaceTruthFusionState.Queue(this);
+
         RefreshCardVisuals();
         return Task.CompletedTask;
     }
@@ -342,30 +340,50 @@ internal static class SamePlaceTruthFusionState
 
     public static bool IsQueued(CardModel card)
     {
-        return QueuedCardRefs.Contains(card) || QueuedCombatCards.Contains(ToKey(card));
+        if (QueuedCardRefs.Contains(card)) return true;
+        return TryToKey(card, out var key) && QueuedCombatCards.Contains(key);
     }
 
     public static void Queue(CardModel card)
     {
         QueuedCardRefs.Add(card);
-        QueuedCombatCards.Add(ToKey(card));
+        if (TryToKey(card, out var key))
+            QueuedCombatCards.Add(key);
     }
 
     public static bool Consume(CardModel card)
     {
         var removedRef = QueuedCardRefs.Remove(card);
-        var removedKey = QueuedCombatCards.Remove(ToKey(card));
+        var removedKey = TryToKey(card, out var key) && QueuedCombatCards.Remove(key);
         return removedRef || removedKey;
     }
 
     public static void Reset(CardModel card)
     {
         QueuedCardRefs.Remove(card);
-        QueuedCombatCards.Remove(ToKey(card));
+        if (TryToKey(card, out var key))
+            QueuedCombatCards.Remove(key);
     }
 
-    private static NetCombatCard ToKey(CardModel card)
+    /// <summary>
+    /// 仅战斗内可变卡片才有 NetCombat 序列化键。
+    /// 图鉴/卡组查看也会创建可变预览实例，但没有 combat ID；
+    /// 悬浮提示（AdditionalHoverTips）会在这些界面求值，必须兜底。
+    /// </summary>
+    private static bool TryToKey(CardModel card, out NetCombatCard key)
     {
-        return NetCombatCard.FromModel(card);
+        key = default;
+        if (!card.IsMutable) return false;
+        if (card.CombatState == null) return false;
+
+        try
+        {
+            key = NetCombatCard.FromModel(card);
+            return true;
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
     }
 }

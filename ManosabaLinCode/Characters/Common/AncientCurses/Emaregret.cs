@@ -1,14 +1,29 @@
+﻿using System.Collections.Generic;
 using System.Threading.Tasks;
+using ManosabaLin.Characters.Common.AncientCurses.Powers;
 
 namespace ManosabaLin.Characters.Common.AncientCurses;
 
-/// <summary>
-/// 樱羽艾玛的悔恨：每当你打出 1 张卡（含自动打出）时失去 1 点生命；
-/// 若你的格挡大于 13，则改为失去 1 点格挡。手牌中才生效。
-/// </summary>
 [RegisterCard(typeof(LinCardPool))]
 public sealed class Emaregret : LinAncientCurseCard
 {
+
+    protected override IEnumerable<DynamicVar> CanonicalVars
+    {
+        get { yield return new DynamicVar("HpLoss", 1m); }
+    }
+
+    protected override async Task AfterPlayerTurnStart(
+        PlayerChoiceContext choiceContext,
+        Player player,
+        ComponentContext componentContext)
+    {
+        if (player != Owner) return;
+        if (Owner.Creature.GetPower<OriginalsinEmaregretBlockLossPower>() is null)
+            await PowerCmd.Apply<OriginalsinEmaregretBlockLossPower>(
+                choiceContext, Owner.Creature, 1m, Owner.Creature, this);
+    }
+
     protected override async Task AfterCardPlayed(
         PlayerChoiceContext choiceContext,
         CardPlay cardPlay,
@@ -19,16 +34,19 @@ public sealed class Emaregret : LinAncientCurseCard
         var creature = Owner.Creature;
         if (creature.IsDead) return;
 
+        var amount = DynamicVars["HpLoss"].BaseValue;
+        if (amount <= 0m) return;
+
         if (creature.Block > 13)
         {
-            await CreatureCmd.LoseBlock(choiceContext, creature, 1m, creature);
+            await CreatureCmd.LoseBlock(choiceContext, creature, amount, creature);
         }
         else
         {
             await CreatureCmd.Damage(
                 choiceContext,
                 creature,
-                1m,
+                amount,
                 ValueProp.Unblockable | ValueProp.Unpowered | ValueProp.Move,
                 this,
                 null);

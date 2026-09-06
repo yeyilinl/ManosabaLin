@@ -59,14 +59,32 @@ public class EmaTrueEndingPower : ManosabaPowerTemplate, IEasyRightClickablePowe
     {
         var card = cardPlay.Card;
         var id = card.Id.Entry;
+
+        // 按卡名计数（含重放触发的 AfterCardPlayed），每个卡名只生效一次
         var count = _cardCounter.GetValueOrDefault(id, 0) + 1;
         _cardCounter[id] = count;
 
-        if (count == InvokeCountTarget)
+        // 已获得标记的卡不再重复触发
+        if (card.HasComponent<EmaTrueEndingTagComponent>()) return;
+
+        if (count == 1)
         {
-            card.TryAddComponent(new EmaTrueEndingTagComponent());
-            card.BaseReplayCount++;
+            // 第1次打出：50%获得「魔女的记忆」标记，并获得重放与打出移除
+            var rng = Owner.Player!.RunState.Rng.CombatCardGeneration;
+            if (rng.NextFloat() < 0.5f)
+                GrantTrueEndingTag(card);
         }
+        else if (count == InvokeCountTarget)
+        {
+            // 第1次未获得，则第2次打出必定获得
+            GrantTrueEndingTag(card);
+        }
+    }
+
+    private static void GrantTrueEndingTag(CardModel card)
+    {
+        card.TryAddComponent(new EmaTrueEndingTagComponent());
+        card.BaseReplayCount++;
     }
 
 

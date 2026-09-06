@@ -38,21 +38,18 @@ public class Rebuttal : ModEnchantmentTemplate
     public override async Task OnPlay(PlayerChoiceContext choiceContext, CardPlay? cardPlay)
     {
         var card = Card;
-        var owner = card.Owner;
+        var owner = card?.Owner;
+        if (card == null || owner == null) return;
+
         var ownerCreature = owner.Creature;
+        if (ownerCreature == null || card.CombatState == null) return;
 
         var badge = owner.Relics.OfType<EmaTrialBadge>().FirstOrDefault();
-
-        int count;
-
+        var count = 1;
         if (badge is not null)
         {
             badge.IncrementCount(this);
             count = badge.RebuttalCount;
-        }
-        else
-        {
-            count = 1;
         }
 
         // 脳1锛氭瘡鐐硅鏁伴€犳垚1鐐逛激瀹?

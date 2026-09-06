@@ -57,13 +57,11 @@ public sealed class Xueqinjincard1 : ManosabaCardTemplate
         var creature = owner.Creature;
         var bond = creature.GetPower<BondPower>();
 
-        // 如果亲近 > 7，本卡变形为 Xueqinjincard2 并加入手牌，跳过所有效果
+        // 如果亲近 > 7，本卡打出后回到手牌并变形为 Xueqinjincard2，跳过所有效果。
+        // 注意：不能在打出中途直接 Transform——替代卡会卡在 Play 牌堆、原卡被移除，
+        // 导致战斗状态损坏并软锁死；变形统一放到打出结束（AfterCardChangedPilesLate，Play→Hand）执行。
         if (bond != null && bond.Affinity > 7)
-        {
-            var transformedCard = source.CombatState.CreateCard<Xueqinjincard2>(owner);
-            await CardCmd.Transform(source, transformedCard);
             return;
-        }
 
         // 疏远 +1
         if (bond != null) bond.Estrangement++;
@@ -85,19 +83,45 @@ public sealed class Xueqinjincard1 : ManosabaCardTemplate
         var picked = selected.FirstOrDefault();
         if (picked == null) return;
 
+        var combatState = source.CombatState;
+        if (combatState == null) return;
+
         var rng = owner.RunState.Rng.CombatCardSelection;
         var chosenType = rng.NextItem(RandomEstrangementCardTypes);
+        if (chosenType == null) return;
 
-        var createCardMethod = typeof(ICombatState).GetMethod("CreateCard", new Type[] { typeof(Player) });
+        var createCardMethod = typeof(ICombatState).GetMethod("CreateCard", [typeof(Player)]);
+        if (createCardMethod == null) return;
+
         var genericMethod = createCardMethod.MakeGenericMethod(chosenType);
-        var estrangementCard = (CardModel)genericMethod.Invoke(source.CombatState, new object[] { owner });
-        estrangementCard.AddKeyword(CardKeyword.Retain);
+        if (genericMethod.Invoke(combatState, [owner]) is not CardModel estrangementCard) return;
 
+        estrangementCard.AddKeyword(CardKeyword.Retain);
         await CardCmd.Transform(picked, estrangementCard);
     }
 
     protected override void OnUpgrade(ComponentContext componentContext)
     {
         EnergyCost.UpgradeBy(-1);
+    }
+
+    protected override CardLocation GetResultLocationForCardPlayC()
+    {
+        var bond = Owner.Creature.GetPower<BondPower>();
+        if (bond != null && bond.Affinity > 7)
+            return new CardLocation(Owner, PileType.Hand, CardPilePosition.Bottom);
+
+        return base.GetResultLocationForCardPlayC();
+    }
+
+    protected override async Task AfterCardChangedPilesLate(CardModel card, PileType oldPileType, AbstractModel? source,
+        ComponentContext componentContext)
+    {
+        if (card != this || oldPileType != PileType.Play || card.Pile?.Type != PileType.Hand) return;
+
+        var bond = Owner.Creature.GetPower<BondPower>();
+        if (bond == null || bond.Affinity <= 7) return;
+
+        await CardCmd.TransformTo<Xueqinjincard2>(this);
     }
 }

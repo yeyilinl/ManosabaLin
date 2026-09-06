@@ -118,17 +118,17 @@ internal static class SamePlaceTruthFusionPreviewPatch
             return;
         }
 
-        // 只有【旧识疑影】且右键已触发拼接（queue）时才显示霜覆初心预览；
-        // 其他任何卡都绝不能让预览节点出现，否则所有手牌都会被覆盖一层霜覆初心。
+        // 右键强化开关：已强化时显示霜覆初心预览+光效，取消后隐藏。
         if (cardNode.Model is SamePlaceTruth truth && SamePlaceTruthFusionState.IsQueued(truth))
         {
             EnsurePreview(cardNode);
-            // 同时把【霜覆初心】的效果提示并入本卡正在显示的悬浮提示面板
             RefreshHolderHoverTipsOnce(truth);
         }
         else
         {
             RemovePreview(cardNode);
+            if (cardNode.Model is SamePlaceTruth canceled && HolderTipsRefreshed.Remove(canceled))
+                RefreshHolderHoverTipsNow(canceled);
         }
     }
 
@@ -144,18 +144,18 @@ internal static class SamePlaceTruthFusionPreviewPatch
     private static void RefreshHolderHoverTipsOnce(SamePlaceTruth truth)
     {
         if (!HolderTipsRefreshed.Add(truth))
-        {
             return;
-        }
 
+        RefreshHolderHoverTipsNow(truth);
+    }
+
+    private static void RefreshHolderHoverTipsNow(SamePlaceTruth truth)
+    {
         var holder = NPlayerHand.Instance?.GetCardHolder(truth);
         var active = holder != null && HasActiveHoverTipSet(holder);
         if (holder == null || !active)
-        {
             return;
-        }
 
-        // 面板当前正在显示：按新状态重建一次；未显示时无需处理（下次悬停自然带上新提示）
         NHoverTipSet.Remove(holder);
         AccessTools.Method(typeof(NCardHolder), "CreateHoverTips")?.Invoke(holder, null);
     }

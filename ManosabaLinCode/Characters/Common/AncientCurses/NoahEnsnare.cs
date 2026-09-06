@@ -1,14 +1,17 @@
+﻿using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace ManosabaLin.Characters.Common.AncientCurses;
 
-/// <summary>
-/// 城崎诺亚的裹挟：抽到此卡时，加入一张"自控的颜料"（无法打出）诅咒卡进入抽牌堆或弃牌堆（随机），
-/// 然后此卡进入弃牌堆或消耗堆（随机）。
-/// </summary>
 [RegisterCard(typeof(LinCardPool))]
 public sealed class NoahEnsnare : LinAncientCurseCard
 {
+
+    protected override IEnumerable<DynamicVar> CanonicalVars
+    {
+        get { yield return new DynamicVar("PaintCount", 1m); }
+    }
+
     protected override async Task AfterCardDrawn(
         PlayerChoiceContext choiceContext,
         CardModel card,
@@ -19,12 +22,14 @@ public sealed class NoahEnsnare : LinAncientCurseCard
         if (CombatState is not { } combatState) return;
 
         var rng = Owner.RunState.Rng.CombatCardGeneration;
+        var count = (int)DynamicVars["PaintCount"].BaseValue;
+        if (count < 1) count = 1;
 
-        var paint = combatState.CreateCard<SelfControlledPaint>(Owner);
-        var paintPile = rng.NextFloat() < 0.5f ? PileType.Draw : PileType.Discard;
-        await CardPileCmd.AddGeneratedCardToCombat(paint, paintPile, Owner, CardPilePosition.Random);
-
-        var selfPile = rng.NextFloat() < 0.5f ? PileType.Discard : PileType.Exhaust;
-        await CardPileCmd.Add(this, selfPile, CardPilePosition.Random);
+        for (var i = 0; i < count; i++)
+        {
+            var paint = combatState.CreateCard<SelfControlledPaint>(Owner);
+            var paintPile = rng.NextFloat() < 0.5f ? PileType.Draw : PileType.Discard;
+            await CardPileCmd.AddGeneratedCardToCombat(paint, paintPile, Owner, CardPilePosition.Random);
+        }
     }
 }

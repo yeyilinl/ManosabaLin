@@ -1,9 +1,5 @@
 namespace ManosabaLin.Characters.Common.AncientCurses.Powers;
 
-/// <summary>
-/// 怯懦的隐藏能力：手牌中存在怯懦时，获得格挡 -2（获得前格挡大于 15 时 -3）。
-/// 获得量被减成负数时，多余部分从现有格挡里扣除。
-/// </summary>
 [RegisterPower]
 public sealed class MeruruCowardicePower : LinCurseConditionalPower<MeruruCowardice>
 {
@@ -19,7 +15,17 @@ public sealed class MeruruCowardicePower : LinCurseConditionalPower<MeruruCoward
     {
         if (target != Owner || !IsCurseInHand()) return 0m;
 
-        var penalty = target.Block > 15 ? 3m : 2m;
+        var penalty = 2m;
+        if (Owner?.Player is { } player)
+        {
+            var curse = PileType.Hand.GetPile(player).Cards.OfType<MeruruCowardice>().FirstOrDefault();
+            if (curse != null && curse.DynamicVars.TryGetValue("Penalty", out var penaltyVar))
+                penalty = penaltyVar.BaseValue;
+        }
+
+        if (target.Block > 15)
+            penalty += 1m;
+
         return -penalty;
     }
 }

@@ -29,43 +29,42 @@ public class Agreement : ModEnchantmentTemplate
     public override async Task OnPlay(PlayerChoiceContext choiceContext, CardPlay? cardPlay)
     {
         var card = Card;
-        var owner = card.Owner;
+        var owner = card?.Owner;
+        if (card == null || owner == null) return;
+
         var ownerCreature = owner.Creature;
-        var combatState = card.CombatState;
+        var combatState = card.CombatState ?? ownerCreature?.CombatState;
+        if (ownerCreature == null || combatState == null) return;
 
         var badge = owner.Relics.OfType<EmaTrialBadge>().FirstOrDefault();
-
-        int count;
-
+        var count = 1;
         if (badge is not null)
         {
             badge.IncrementCount(this);
             count = badge.AgreeCount;
         }
-        else
-        {
-            count = 1;
-        }
+
+        var allies = combatState.Allies.Where(static a => a is { IsAlive: true }).ToList();
 
         // ×1：全体友方3护盾
-        foreach (var ally in combatState.Allies.Where(a => a is { IsAlive: true }))
-            await CreatureCmd.GainBlock(ally, 3m, ValueProp.Move, cardPlay);
+        foreach (var ally in allies)
+            await CreatureCmd.GainBlock(ally, 3m, ValueProp.Move, null);
 
         // ×2：自己3护盾
         if (count % 2 == 0)
-            await CreatureCmd.GainBlock(ownerCreature, 3m, ValueProp.Move, cardPlay);
+            await CreatureCmd.GainBlock(ownerCreature, 3m, ValueProp.Move, null);
 
         // ×3：全体临时迅捷
         if (count % 3 == 0)
         {
-            foreach (var ally in combatState.Allies.Where(a => a is { IsAlive: true }))
+            foreach (var ally in allies)
                 await PowerCmd.Apply<TempDexterity>(choiceContext, ally, 1m, ownerCreature, null, false);
         }
 
         // ×4：全体临时力量
         if (count % 4 == 0)
         {
-            foreach (var ally in combatState.Allies.Where(a => a is { IsAlive: true }))
+            foreach (var ally in allies)
                 await PowerCmd.Apply<TempStrength>(choiceContext, ally, 2m, ownerCreature, null, false);
         }
 
@@ -80,7 +79,7 @@ public class Agreement : ModEnchantmentTemplate
             {
                 var rng = owner.RunState.Rng.CombatCardSelection;
                 var randomCard = rng.NextItem(otherCards);
-                randomCard.SetToFreeThisTurn();
+                randomCard?.SetToFreeThisTurn();
             }
 
             foreach (var p in combatState.Players)

@@ -1,5 +1,4 @@
-using ManosabaLin.Characters.Common.Components;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -12,8 +11,6 @@ namespace ManosabaLin.Characters.Common.AncientCurses;
 [RegisterCard(typeof(LinCardPool))]
 public sealed class MargeCharm : LinAncientCurseCard
 {
-    // 测试挂载：原罪组件正式由其他卡牌 AddComponent 添加，此处仅用于测试。
-    protected override IEnumerable<ICardComponent> CanonicalComponents => [new Originalsin()];
 
     protected override IEnumerable<DynamicVar> CanonicalVars
     {

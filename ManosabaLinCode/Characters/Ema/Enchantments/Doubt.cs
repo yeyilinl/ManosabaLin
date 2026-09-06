@@ -33,24 +33,22 @@ public class Doubt : ModEnchantmentTemplate
     public override async Task OnPlay(PlayerChoiceContext choiceContext, CardPlay? cardPlay)
     {
         var card = Card;
-        var owner = card.Owner;
+        var owner = card?.Owner;
+        if (card == null || owner == null) return;
+
         var ownerCreature = owner.Creature;
+        if (ownerCreature == null) return;
 
         var badge = owner.Relics.OfType<EmaTrialBadge>().FirstOrDefault();
-
-        int count;
-
+        var count = 1;
         if (badge is not null)
         {
             badge.IncrementCount(this);
             count = badge.DoubtCount;
         }
-        else
-        {
-            count = 1;
-        }
+
         // ×1：获得1点护盾
-        await CreatureCmd.GainBlock(ownerCreature, 1m, ValueProp.Move, cardPlay);
+        await CreatureCmd.GainBlock(ownerCreature, 1m, ValueProp.Move, null);
 
         // ×2：抽一张卡
         if (count % 2 == 0)

@@ -1,18 +1,12 @@
-using System.Collections.Generic;
-using System.Linq;
+﻿using System.Linq;
 using System.Threading.Tasks;
 
 namespace ManosabaLin.Characters.Common.AncientCurses;
 
-/// <summary>
-/// 泽度可可的忧泯：抽到此卡时获得 1 点能量，并将手牌中最高稀有度的卡与
-/// 抽牌堆 / 弃牌堆 / 消耗堆中低一等稀有度的卡交换位置。
-/// 手牌全是同稀有度或只有 1 张时随机换一张；若所有牌堆的卡稀有度都一样，
-/// 则换成基础稀有度；连基础卡都没有就不生效（能量照常获得）。
-/// </summary>
 [RegisterCard(typeof(LinCardPool))]
 public sealed class Cocoworry : LinAncientCurseCard
 {
+
     protected override async Task AfterCardDrawn(
         PlayerChoiceContext choiceContext,
         CardModel card,

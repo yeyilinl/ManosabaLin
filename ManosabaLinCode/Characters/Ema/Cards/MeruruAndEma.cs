@@ -78,31 +78,6 @@ public sealed class MeruruAndEma() : ManosabaCardTemplate(1, CardType.Power, Car
         HasAutoPlayedThisCombat = true;
         this.SetFreeIgnoringCardPlayConditions();
         await CardCmd.AutoPlay(choiceContext, this, null, skipCardPileVisuals: true);
-
-        if (Pile?.IsCombatPile == true)
-            await CardPileCmd.RemoveFromCombat(this);
-
-        await RemoveMeruruAndEmaCardsFromHand();
-    }
-
-    protected override CardLocation GetResultLocationForCardPlayC()
-    {
-        return new CardLocation(Owner, PileType.None, CardPilePosition.Bottom);
-    }
-
-    protected override async Task AfterCardChangedPilesLate(
-        CardModel card,
-        PileType oldPileType,
-        AbstractModel? source,
-        ComponentContext componentContext)
-    {
-        if (!HasAutoPlayedThisCombat) return;
-        if (card.Owner != Owner) return;
-        if (card is not MeruruAndEma) return;
-        if (card.Pile?.Type != PileType.Hand) return;
-        if (card.HasBeenRemovedFromState) return;
-
-        await CardPileCmd.RemoveFromCombat(card);
     }
 
     protected override async Task OnPlay(
@@ -122,25 +97,12 @@ public sealed class MeruruAndEma() : ManosabaCardTemplate(1, CardType.Power, Car
 
         if (Owner.Creature.GetPower<MeruruAndEmaAccomplicePower>() is { } accomplice)
             await accomplice.ResolveCardPlayedStage(choiceContext, this);
-
-        await RemoveMeruruAndEmaCardsFromHand();
     }
 
     public void IncreaseAccompliceStacksToGain(int amount)
     {
         if (amount <= 0) return;
         AccompliceStacksToGain = Math.Min(MaxAccompliceStacks, AccompliceStacksToGain + amount);
-    }
-
-    private async Task RemoveMeruruAndEmaCardsFromHand()
-    {
-        var handCards = PileType.Hand.GetPile(Owner).Cards
-            .OfType<MeruruAndEma>()
-            .Where(static card => !card.HasBeenRemovedFromState)
-            .ToList();
-
-        foreach (var handCard in handCards)
-            await CardPileCmd.RemoveFromCombat(handCard);
     }
 
     public override void BetterAddExtraArgsToDescription(

@@ -1,15 +1,20 @@
+﻿using System.Collections.Generic;
 using System.Threading.Tasks;
 using ManosabaLin.Characters.Common.AncientCurses.Powers;
+using ManosabaLin.Characters.Common.Powers;
+using TempStrength = ManosabaLin.Characters.Common.Powers.TempStrength;
 
 namespace ManosabaLin.Characters.Common.AncientCurses;
 
-/// <summary>
-/// 橘雪莉的空洞：你造成的低于 13 的伤害减半（向下取整），按每次伤害实例判定；
-/// 若打出的卡产生了被减半的伤害，则获得 1 层临时力量。手牌中才生效。
-/// </summary>
 [RegisterCard(typeof(LinCardPool))]
 public sealed class SherryVoid : LinAncientCurseCard
 {
+
+    protected override IEnumerable<DynamicVar> CanonicalVars
+    {
+        get { yield return new DynamicVar("Threshold", 13m); }
+    }
+
     protected override async Task AfterPlayerTurnStart(
         PlayerChoiceContext choiceContext,
         Player player,
@@ -29,6 +34,6 @@ public sealed class SherryVoid : LinAncientCurseCard
         if (Owner.Creature.GetPower<SherryVoidPower>() is not { } power) return;
         if (!power.ConsumeHalvedPlay()) return;
 
-        await PowerCmd.Apply<TemporaryStrengthPower>(choiceContext, Owner.Creature, 1m, Owner.Creature, this);
+        await PowerCmd.Apply<TempStrength>(choiceContext, Owner.Creature, 1m, Owner.Creature, this);
     }
 }

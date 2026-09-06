@@ -47,13 +47,15 @@ public sealed class SubstituteCost : ManosabaCardTemplate
                 choiceContext, creature, affinity, creature, this, false);
         }
 
-        await PowerCmd.Apply<LoseEnergyPower>(
-            choiceContext, creature, 2, creature, this, false);
-
         if (bond != null && bond.Affinity > bond.Estrangement)
         {
             await PowerCmd.Apply<GainEnergyPower>(
                 choiceContext, creature, DynamicVars["GainEnergy"].BaseValue, creature, this, false);
+        }
+        else
+        {
+            await PowerCmd.Apply<LoseEnergyPower>(
+                choiceContext, creature, 2, creature, this, false);
         }
     }
 

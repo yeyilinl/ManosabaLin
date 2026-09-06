@@ -13,6 +13,8 @@ namespace ManosabaLin.Characters.Ema.Powers;
 [RegisterPower]
 public sealed class EmaBadEndingRewardPower : ManosabaPowerTemplate
 {
+    private const int RewardCardCount = 2;
+
     public override PowerType Type => PowerType.Buff;
 
     public override PowerStackType StackType => PowerStackType.Single;
@@ -27,7 +29,7 @@ public sealed class EmaBadEndingRewardPower : ManosabaPowerTemplate
             .Where(c => c is not EmaEnding && c.Rarity is CardRarity.Rare or CardRarity.Uncommon)
             .ToList()
             .StableShuffle(Owner.Player.RunState.Rng.Shuffle)
-            .Take(Amount);
+            .Take(RewardCardCount);
 
         foreach (var card in cards)
             target.AddComponent(new EmaBadEndingRewardComponent(card));

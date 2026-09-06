@@ -29,8 +29,9 @@ public sealed partial class EmaBadEndingRewardComponent : CardComponent
 
         var use = card.Rarity switch
         {
-            CardRarity.Rare => 1,
-            CardRarity.Uncommon => 2,
+            // 附加的罕见卡(Uncommon)可以打出1次附加效果，稀有卡(Rare)可以打出2次
+            CardRarity.Rare => 2,
+            CardRarity.Uncommon => 1,
             _ => throw new AbandonedMutexException($"Unexpected rarity {card.Rarity} for card {card.Id}")
         };
 

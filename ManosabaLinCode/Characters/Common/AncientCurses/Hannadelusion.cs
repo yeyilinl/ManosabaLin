@@ -1,14 +1,17 @@
+﻿using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace ManosabaLin.Characters.Common.AncientCurses;
 
-/// <summary>
-/// 远野汉娜的狂想：每当你打出 1 张牌（含自动打出）时，有 10% 概率
-/// 获得 20 金币或失去 10 金币（各 50%）；金币不足 10 时失去 10 会变为 0。不在手牌时生效。
-/// </summary>
 [RegisterCard(typeof(LinCardPool))]
 public sealed class Hannadelusion : LinAncientCurseCard
 {
+
+    protected override IEnumerable<DynamicVar> CanonicalVars
+    {
+        get { yield return new DynamicVar("Chance", 10m); }
+    }
+
     protected override async Task AfterCardPlayed(
         PlayerChoiceContext choiceContext,
         CardPlay cardPlay,
@@ -17,8 +20,14 @@ public sealed class Hannadelusion : LinAncientCurseCard
         if (Pile is { Type: PileType.Hand }) return;
 
         var rng = Owner.RunState.Rng.CombatCardGeneration;
-        if (rng.NextFloat() >= 0.1f) return;
+        var chance = (float)(DynamicVars["Chance"].BaseValue / 100m);
+        if (rng.NextFloat() >= chance) return;
 
+        await RunGoldChange(rng);
+    }
+
+    internal async Task RunGoldChange(MegaCrit.Sts2.Core.Random.Rng rng)
+    {
         if (rng.NextFloat() < 0.5f)
             await PlayerCmd.GainGold(20, Owner);
         else
