@@ -22,7 +22,7 @@ public sealed class WitchFactor : ManosabaRelicTemplate
         {
             return new[]
             {
-                new PowerVar<WithPower>("AttackGain", 20),
+                new PowerVar<WithPower>("AttackGain", 15),
                 new PowerVar<WithPower>("SkillLoss", 10),
                 new PowerVar<WithPower>("PowerLoss", 10)
             };

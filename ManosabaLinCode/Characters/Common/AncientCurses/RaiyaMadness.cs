@@ -7,6 +7,7 @@ namespace ManosabaLin.Characters.Common.AncientCurses;
 [RegisterCard(typeof(LinCardPool))]
 public sealed class RaiyaMadness : LinAncientCurseCard
 {
+    public RaiyaMadness() : base(3) { }
 
     private bool _extraing;
 

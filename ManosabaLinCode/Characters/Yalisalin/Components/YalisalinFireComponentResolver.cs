@@ -201,21 +201,13 @@ public static class YalisalinFireComponentResolver
             return context.ChoiceOptions[0];
 
         using var scope = YalisalinFireComponentSelectionRegistry.Begin(context);
-        return (await CardSelectCmd.FromSimpleGrid(
+
+        // 新选择器：与「是/否」选卡界面同一套 UI（NChooseACardSelectionScreen），
+        // 大卡展示选项「原牌/连接牌」本身，而非 token 卡。
+        return await CardSelectCmd.FromChooseACardScreen(
             choiceContext,
             context.ChoiceOptions,
-            context.Owner,
-            new CardSelectorPrefs(
-                BuildSelectionPrompt(context),
-                1,
-                1))).FirstOrDefault();
-    }
-
-    private static LocString BuildSelectionPrompt(YalisalinFireComponentContext context)
-    {
-        var loc = new LocString("cards", "ManosabaLin.YalisalinFireComponent.dynamicSelectionScreenPrompt");
-        loc.Add("Prompt", context.SelectionPromptText);
-        return loc;
+            context.Owner);
     }
 
     private static IEnumerable<CardModel> DetermineBurnQueue(YalisalinFireComponentContext context)
@@ -524,6 +516,13 @@ public static class YalisalinFireComponentResolver
     private static IEnumerable<IYalisalinFireComponentModifier> EnumerateModifierObjects(
         YalisalinFireComponentContext context)
     {
+        // 源卡自身必须参与：手动打出时源卡在 Play 堆，AllCombatCards（手/抽/弃）枚举不到它，
+        // 否则 Unwantedkindness/Beforeforgiven/Glasshug/Fifthselfproof 等挂在源卡上的
+        // AfterFireComponentBurned / AfterFireComponentChoiceCompleted 回调永远不会触发
+        // （表现为「烧了牌但没抽牌」）。GetModifiers 会按实例去重，与手/抽/弃中的重复项只回调一次。
+        foreach (var modifier in YalisalinFireComponentRules.CardModifiers(context.SourceCard))
+            yield return modifier;
+
         foreach (var relic in context.Owner.Relics.OfType<IYalisalinFireComponentModifier>())
             yield return relic;
 

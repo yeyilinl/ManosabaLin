@@ -24,6 +24,7 @@ public sealed class AnanlinNoAnswer() : ManosabaCardTemplate(1, CardType.Power, 
 
     protected override void OnUpgrade(ComponentContext componentContext)
     {
-        DynamicVars["AnanlinNoAnswerPower"].UpgradeValueBy(1m);
+        // 升级改为减 1 费（不再提升缄默替换意图数值）
+        EnergyCost.UpgradeBy(-1);
     }
 }

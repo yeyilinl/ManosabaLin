@@ -1,3 +1,4 @@
+using ManosabaLin.Characters.Common.Components;
 using ManosabaLin.Characters.Yalisalin.Capabilities;
 using ManosabaLin.Characters.Yalisalin.Cards;
 using ManosabaLin.Characters.Yalisalin.Components;
@@ -27,14 +28,11 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
 
     [SavedProperty] public int PainKeeperPerTurnLimit { get; private set; }
     [SavedProperty] public int PainKeeperUsedThisTurn { get; private set; }
-    [SavedProperty] public int DazzlingToleranceStacks { get; private set; }
-    [SavedProperty] public bool BurnedApologyEnabled { get; private set; }
     [SavedProperty] public int UnneededGoodChildPendingCount { get; private set; }
     [SavedProperty] public int UnneededGoodChildPendingEnergy { get; private set; }
     [SavedProperty] public bool SeparatedEndsEnabled { get; private set; }
     [SavedProperty] public int SeparatedEndsBlock { get; private set; }
     [SavedProperty] public int SeparatedEndsDraw { get; private set; }
-    [SavedProperty] public bool WarmthShouldNotStayEnabled { get; private set; }
     [SavedProperty] public int FireComponentBurnsThisTurn { get; private set; }
     [SavedProperty] public int ManualFireComponentsCompletedThisCombat { get; private set; }
     [SavedProperty] public int PendingBringHomeEnergy { get; private set; }
@@ -46,8 +44,6 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
     [SavedProperty] public int PreserveHighestAtTurnStart { get; private set; }
     [SavedProperty] public bool PreserveHighestRewriteEnergyEnabled { get; private set; }
     [SavedProperty] public bool PreserveHighestRewriteEnergyUsedThisTurn { get; private set; }
-    [SavedProperty] public bool MixedConclusionEnabled { get; private set; }
-    [SavedProperty] public bool MixedConclusionUsedThisTurn { get; private set; }
     [SavedProperty] public bool FullRefillPreserveEnabled { get; private set; }
     [SavedProperty] public bool FullRefillPreserveUsedThisTurn { get; private set; }
     [SavedProperty] public bool ThirteenthListeningEnabled { get; private set; }
@@ -62,6 +58,15 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
     [SavedProperty] public int RedConsumePairProgress { get; private set; }
     [SavedProperty] public bool HasLastConsumedFireColorThisTurn { get; private set; }
     [SavedProperty] public YalisalinFireColor LastConsumedFireColorThisTurn { get; private set; }
+
+    // —— 原罪体系战斗计数（罪业圣盾 / 嫉恨反噬 共用同一个过失计数器）——
+    private bool _sinHookActive;
+    [SavedProperty] public int SinForgiveThisCombat { get; private set; }
+    [SavedProperty] public int SinPunishThisCombat { get; private set; }
+    [SavedProperty] public int SinForgiveThisTurn { get; private set; }
+    [SavedProperty] public int SinPunishThisTurn { get; private set; }
+    [SavedProperty] public int SinForgiveLastTurn { get; private set; }
+    [SavedProperty] public int SinPunishLastTurn { get; private set; }
 
     public override RelicRarity Rarity => RelicRarity.Starter;
     public override bool ShowCounter => false;
@@ -100,35 +105,11 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
         Flash();
     }
 
-    public void EnableDazzlingTolerance()
-    {
-        DazzlingToleranceStacks++;
-        Flash();
-    }
-
-    public void EnableBurnedApology()
-    {
-        BurnedApologyEnabled = true;
-        Flash();
-    }
-
     public void EnableSeparatedEnds(int block, int draw)
     {
         SeparatedEndsEnabled = true;
         SeparatedEndsBlock = Math.Max(SeparatedEndsBlock, block);
         SeparatedEndsDraw = Math.Max(SeparatedEndsDraw, draw);
-        Flash();
-    }
-
-    public void EnableWarmthShouldNotStay()
-    {
-        WarmthShouldNotStayEnabled = true;
-        Flash();
-    }
-
-    public void EnableMixedConclusion()
-    {
-        MixedConclusionEnabled = true;
         Flash();
     }
 
@@ -351,13 +332,13 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
                 "enhancement.painKeeper.count",
                 ("Count", PainKeeperPerTurnLimit));
 
-        if (DazzlingToleranceStacks > 0)
+        if (Owner.Creature.GetPower<DazzlingTolerancePower>() is { Amount: > 0 } dazzling)
             yield return YalisalinFireComponentContext.Text(
                 "enhancement.dazzlingTolerance",
-                ("Damage", DazzlingToleranceStacks),
-                ("Block", DazzlingToleranceStacks * 2));
+                ("Damage", dazzling.Amount),
+                ("Block", dazzling.Amount * 2));
 
-        if (BurnedApologyEnabled)
+        if (Owner.Creature.GetPower<BurnedApologyPower>() != null)
             yield return YalisalinFireComponentContext.Text("enhancement.burnedApology");
 
         if (SeparatedEndsEnabled)
@@ -366,7 +347,7 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
                 ("Block", SeparatedEndsBlock),
                 ("Cards", SeparatedEndsDraw));
 
-        if (WarmthShouldNotStayEnabled)
+        if (Owner.Creature.GetPower<WarmthShouldNotStayPower>() != null)
             yield return YalisalinFireComponentContext.Text("enhancement.warmthShouldNotStay");
 
         if (UnneededGoodChildPendingCount > 0)
@@ -378,22 +359,26 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
 
     public override Task BeforeCombatStart()
     {
+        HookSinEvents();
         _gauges.Clear();
         _dontLookAtMeCards.Clear();
         _glassReturnCards.Clear();
         _bringHomeCards.Clear();
         _currentFireColorTarget = null;
         _conversionSequence = 0;
+        SinForgiveThisCombat = 0;
+        SinPunishThisCombat = 0;
+        SinForgiveThisTurn = 0;
+        SinPunishThisTurn = 0;
+        SinForgiveLastTurn = 0;
+        SinPunishLastTurn = 0;
         PainKeeperPerTurnLimit = 0;
         PainKeeperUsedThisTurn = 0;
-        DazzlingToleranceStacks = 0;
-        BurnedApologyEnabled = false;
         UnneededGoodChildPendingCount = 0;
         UnneededGoodChildPendingEnergy = 0;
         SeparatedEndsEnabled = false;
         SeparatedEndsBlock = 0;
         SeparatedEndsDraw = 0;
-        WarmthShouldNotStayEnabled = false;
         FireComponentBurnsThisTurn = 0;
         ManualFireComponentsCompletedThisCombat = 0;
         PendingBringHomeEnergy = 0;
@@ -405,8 +390,6 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
         PreserveHighestAtTurnStart = 0;
         PreserveHighestRewriteEnergyEnabled = false;
         PreserveHighestRewriteEnergyUsedThisTurn = false;
-        MixedConclusionEnabled = false;
-        MixedConclusionUsedThisTurn = false;
         FullRefillPreserveEnabled = false;
         FullRefillPreserveUsedThisTurn = false;
         ThirteenthListeningEnabled = false;
@@ -425,6 +408,7 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
 
     public override Task AfterCombatEnd(CombatRoom room)
     {
+        UnhookSinEvents();
         _gauges.Clear();
         _dontLookAtMeCards.Clear();
         _glassReturnCards.Clear();
@@ -433,14 +417,11 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
         _conversionSequence = 0;
         PainKeeperPerTurnLimit = 0;
         PainKeeperUsedThisTurn = 0;
-        DazzlingToleranceStacks = 0;
-        BurnedApologyEnabled = false;
         UnneededGoodChildPendingCount = 0;
         UnneededGoodChildPendingEnergy = 0;
         SeparatedEndsEnabled = false;
         SeparatedEndsBlock = 0;
         SeparatedEndsDraw = 0;
-        WarmthShouldNotStayEnabled = false;
         FireComponentBurnsThisTurn = 0;
         ManualFireComponentsCompletedThisCombat = 0;
         PendingBringHomeEnergy = 0;
@@ -452,8 +433,6 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
         PreserveHighestAtTurnStart = 0;
         PreserveHighestRewriteEnergyEnabled = false;
         PreserveHighestRewriteEnergyUsedThisTurn = false;
-        MixedConclusionEnabled = false;
-        MixedConclusionUsedThisTurn = false;
         FullRefillPreserveEnabled = false;
         FullRefillPreserveUsedThisTurn = false;
         ThirteenthListeningEnabled = false;
@@ -470,6 +449,54 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
         return Task.CompletedTask;
     }
 
+    private void HookSinEvents()
+    {
+        if (_sinHookActive) return;
+        Originalsin.ForgiveTriggered += OnSinForgive;
+        Originalsin.PunishTriggered += OnSinPunish;
+        _sinHookActive = true;
+    }
+
+    private void UnhookSinEvents()
+    {
+        if (!_sinHookActive) return;
+        Originalsin.ForgiveTriggered -= OnSinForgive;
+        Originalsin.PunishTriggered -= OnSinPunish;
+        _sinHookActive = false;
+    }
+
+    private async void OnSinForgive(PlayerChoiceContext choiceContext, CardModel forgiven)
+    {
+        try
+        {
+            if (forgiven.Owner?.Creature != Owner.Creature) return;
+            SinForgiveThisTurn++;
+            SinForgiveThisCombat++;
+            Flash();
+            await Task.CompletedTask;
+        }
+        catch (Exception ex)
+        {
+            Log.Error($"YalisalinsHairpin.OnSinForgive failed: {ex}");
+        }
+    }
+
+    private async void OnSinPunish(PlayerChoiceContext choiceContext, CardModel punished)
+    {
+        try
+        {
+            if (punished.Owner?.Creature != Owner.Creature) return;
+            SinPunishThisTurn++;
+            SinPunishThisCombat++;
+            Flash();
+            await Task.CompletedTask;
+        }
+        catch (Exception ex)
+        {
+            Log.Error($"YalisalinsHairpin.OnSinPunish failed: {ex}");
+        }
+    }
+
     public override async Task AfterPlayerTurnStart(PlayerChoiceContext choiceContext, Player player)
     {
         if (player != Owner)
@@ -480,11 +507,17 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
         YellowNextTurnEnergyGrantedThisTurn = 0;
         PendingYellowCostReduction = 0;
         PreserveHighestRewriteEnergyUsedThisTurn = false;
-        MixedConclusionUsedThisTurn = false;
+        Owner.Creature.GetPower<MixedConclusionPower>()?.ResetUsedThisTurn();
         FullRefillPreserveUsedThisTurn = false;
         ThirteenthCoverUsedThisTurn = false;
         ThirteenthRewriteUsedThisTurn = false;
         HasLastConsumedFireColorThisTurn = false;
+
+        // 新回合开始：把已结束回合的宽恕/自惩数转移到“上一回合”
+        SinForgiveLastTurn = SinForgiveThisTurn;
+        SinPunishLastTurn = SinPunishThisTurn;
+        SinForgiveThisTurn = 0;
+        SinPunishThisTurn = 0;
 
         if (PreserveHighestAtTurnStart > 0)
             PreserveHighestFireColor += PreserveHighestAtTurnStart;
@@ -623,7 +656,8 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
         PlayerChoiceContext choiceContext,
         YalisalinFireComponentContext context)
     {
-        if (BurnedApologyEnabled)
+        // 把道歉烧成灰（独立能力 Power）：余火烧掉的牌先自动打出1次再烧掉
+        if (Owner.Creature.GetPower<BurnedApologyPower>() != null)
             context.CustomData["AutoPlayBurnedCard"] = true;
 
         if (UnneededGoodChildPendingCount <= 0 || context.BurnedCard == null)
@@ -675,7 +709,10 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
 
         if (context.BurnedCard is { } burned)
         {
-            await ResolveDazzlingTolerance(choiceContext, context, burned);
+            // 你的包容很刺眼（独立能力 Power）：余火烧掉牌时造成伤害+格挡
+            if (Owner.Creature.GetPower<DazzlingTolerancePower>() is { } tolerance)
+                await tolerance.ResolveBurned(choiceContext, burned, context.SourceCard, context.CardPlay);
+
             await ResolveDontLookAtMe(choiceContext, burned);
         }
     }
@@ -684,9 +721,9 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
         PlayerChoiceContext choiceContext,
         YalisalinFireComponentContext context)
     {
-        if (WarmthShouldNotStayEnabled)
-            YalisalinFireComponentRules.TryAddFireComponent(
-                YalisalinFireComponentRules.RandomCardWithoutFireComponent(Owner));
+        // 不该留下的温柔（独立能力 Power）：余火选择完成时随机给无余火的牌加余火
+        if (Owner.Creature.GetPower<WarmthShouldNotStayPower>() is { } warmth)
+            warmth.ResolveAfterComponent(Owner);
 
         return Task.CompletedTask;
     }
@@ -714,31 +751,6 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
                 YalisalinFireComponentRules.TryAddFireComponent(
                     YalisalinFireComponentRules.RandomCardWithoutFireComponent(Owner));
                 break;
-        }
-    }
-
-    private async Task ResolveDazzlingTolerance(
-        PlayerChoiceContext choiceContext,
-        YalisalinFireComponentContext context,
-        CardModel burned)
-    {
-        if (DazzlingToleranceStacks <= 0)
-            return;
-
-        var count = IsCurse(burned) ? 3 : 1;
-        var damage = DazzlingToleranceStacks;
-        var block = DazzlingToleranceStacks * 2;
-        for (var i = 0; i < count; i++)
-        {
-            if (Owner.Creature.CombatState is { } combatState)
-            {
-                await DamageCmd.Attack(damage)
-                    .FromCard(context.SourceCard, context.CardPlay)
-                    .TargetingRandomOpponents(combatState)
-                    .Execute(choiceContext);
-            }
-
-            await CreatureCmd.GainBlock(Owner.Creature, block, ValueProp.Move, context.CardPlay);
         }
     }
 
@@ -776,26 +788,28 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
         return changed;
     }
 
-    public bool TryConvertFireColor(Creature target, CardModel? source = null)
+    public bool TryConvertFireColor(Creature target, out YalisalinFireColor promoteColor, CardModel? source = null)
     {
+        promoteColor = default;
         if (!CanTrack(target))
             return false;
 
         _currentFireColorTarget = target;
-        var changed = GetOrCreateGauge(target).TryPromoteOnce(IsCarbonizationUnlocked, ref _conversionSequence);
+        var changed = GetOrCreateGauge(target).TryPromoteOnce(IsCarbonizationUnlocked, ref _conversionSequence, out promoteColor);
         if (changed)
             Flash();
 
         return changed;
     }
 
-    public bool TryStrongConvertFireColor(Creature target, CardModel? source = null)
+    public bool TryStrongConvertFireColor(Creature target, out YalisalinFireColor promoteColor, CardModel? source = null)
     {
+        promoteColor = default;
         if (!CanTrack(target))
             return false;
 
         _currentFireColorTarget = target;
-        var changed = GetOrCreateGauge(target).TryStrongPromoteOnce(IsCarbonizationUnlocked, ref _conversionSequence);
+        var changed = GetOrCreateGauge(target).TryStrongPromoteOnce(IsCarbonizationUnlocked, ref _conversionSequence, out promoteColor);
         if (changed)
             Flash();
 
@@ -899,8 +913,9 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
             return;
 
         var resolvedAny = false;
+        // 同色多段在同一回合只结算一次（colors 已去重）；每种颜色独立触发自己的奖励
         if (colors.Contains(YalisalinFireColor.LightOrange))
-            resolvedAny |= await TryChooseFireColorCardToHand(choiceContext);
+            resolvedAny |= await TryRandomFireColorCardToHand(choiceContext);
 
         if (colors.Contains(YalisalinFireColor.BrightYellow))
         {
@@ -919,7 +934,8 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
             Flash();
     }
 
-    private async Task<bool> TryChooseFireColorCardToHand(PlayerChoiceContext choiceContext)
+    // 浅橙色回合开始奖励：从抽牌堆/弃牌堆自动随机取 1 张加入手牌（不弹窗）。
+    private async Task<bool> TryRandomFireColorCardToHand(PlayerChoiceContext choiceContext)
     {
         var options = new[] { PileType.Draw, PileType.Discard }
             .SelectMany(pileType => pileType.GetPile(Owner).Cards)
@@ -930,21 +946,7 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
         if (options.Count == 0)
             return false;
 
-        var selected = (await CardSelectCmd.FromSimpleGrid(
-            choiceContext,
-            options,
-            Owner,
-            new CardSelectorPrefs(
-                new LocString("relics", $"{Id.Entry}.fireColor.selectionScreenPrompt"),
-                0,
-                1)
-            {
-                Cancelable = true
-            })).FirstOrDefault();
-
-        if (selected == null)
-            return false;
-
+        var selected = options[Random.Shared.Next(options.Count)];
         await CardPileCmd.Add(selected, PileType.Hand);
         return true;
     }
@@ -1014,12 +1016,13 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
         YalisalinFireColor color,
         CardModel? source)
     {
-        if (MixedConclusionEnabled
-            && !MixedConclusionUsedThisTurn
+        var mixed = Owner.Creature.GetPower<MixedConclusionPower>();
+        if (mixed is { } mc
+            && !mc.IsUsedThisTurn
             && HasLastConsumedFireColorThisTurn
             && LastConsumedFireColorThisTurn != color)
         {
-            MixedConclusionUsedThisTurn = true;
+            mc.MarkUsed();
             GrantSealedFire(color);
             await YalisalinSealedFirePower.Sync(choiceContext, Owner, source);
             await CardPileCmd.Draw(choiceContext, 1, Owner);
@@ -1309,21 +1312,25 @@ internal sealed class YalisalinFireColorGauge
         return true;
     }
 
-    public bool TryPromoteOnce(bool canCarbonize, ref long conversionSequence)
+    public bool TryPromoteOnce(bool canCarbonize, ref long conversionSequence, out YalisalinFireColor promoteColor)
     {
+        promoteColor = default;
         if (!IsFull)
             return false;
 
         var lowestColor = _segments.Min(segment => segment.Color);
+        promoteColor = lowestColor;
         return TryPromoteColor(lowestColor, canCarbonize, ref conversionSequence);
     }
 
-    public bool TryStrongPromoteOnce(bool canCarbonize, ref long conversionSequence)
+    public bool TryStrongPromoteOnce(bool canCarbonize, ref long conversionSequence, out YalisalinFireColor promoteColor)
     {
+        promoteColor = default;
         if (_segments.Count == 0)
             return false;
 
         var highestColor = _segments.Max(segment => segment.Color);
+        promoteColor = highestColor;
         return TryPromoteColor(highestColor, canCarbonize, ref conversionSequence);
     }
 
@@ -1397,17 +1404,17 @@ internal sealed class YalisalinFireColorGauge
     {
         var ordered = OrderedSegments().ToList();
 
-        if (ordered.Count >= YalisalinsHairpin.MaxSegments)
-        {
-            // 量表已满：直接替换掉对应位置的火色（不增加总格数）
-            var replaceIndex = Math.Clamp(slotIndex, 0, ordered.Count - 1);
-            ordered[replaceIndex] = new YalisalinFireColorSegment(color, 0);
-        }
-        else
-        {
-            var index = Math.Clamp(slotIndex, 0, ordered.Count);
-            ordered.Insert(index, new YalisalinFireColorSegment(color, 0));
-        }
+        // 选格插入：
+        // - 点击空格子（slotIndex >= 已有火色数）：追加到已有火色末尾的「下一格」。
+        // - 点击已有火色格：在该格插入，原该格及其后火色整体下移一格；
+        //   超出量表上限（MaxSegments）的火色直接消失，不触发任何消耗/奖励效果。
+        var insertIndex = slotIndex >= ordered.Count
+            ? ordered.Count
+            : Math.Clamp(slotIndex, 0, Math.Max(0, ordered.Count - 1));
+        ordered.Insert(insertIndex, new YalisalinFireColorSegment(color, 0));
+
+        if (ordered.Count > YalisalinsHairpin.MaxSegments)
+            ordered.RemoveRange(YalisalinsHairpin.MaxSegments, ordered.Count - YalisalinsHairpin.MaxSegments);
 
         _segments.Clear();
         foreach (var segment in ordered)

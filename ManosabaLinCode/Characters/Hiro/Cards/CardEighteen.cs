@@ -11,7 +11,7 @@ using STS2RitsuLib.Interop.AutoRegistration;
 
 namespace ManosabaLin.Characters.Hiro.Cards;
 
-[RegisterCard(typeof(HiroCardPool))]
+[RegisterCard(typeof(HirolinCardPool))]
 public sealed class CardEighteen() : ManosabaCardTemplate(0, CardType.Skill, CardRarity.Uncommon, TargetType.Self)
 {
     // 需要消耗的伪证层数（固定 2 层）

@@ -13,7 +13,7 @@ using System.Linq;
 
 namespace ManosabaLin.Characters.Hiro.Cards;
 
-[RegisterCard(typeof(HiroCardPool))]
+[RegisterCard(typeof(HirolinCardPool))]
 public sealed class Xhelp() : ManosabaCardTemplate(2, CardType.Attack, CardRarity.Uncommon, TargetType.AnyPlayer)
 {
     public override bool GainsBlock => true;

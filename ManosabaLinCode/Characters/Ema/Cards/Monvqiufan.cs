@@ -13,7 +13,9 @@ using MegaCrit.Sts2.Core.ValueProps;
 using STS2RitsuLib.Interop.AutoRegistration;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using System.Linq;
 using ManosabaLin.Characters.Common.Powers;
+using ManosabaLin.Characters.Ema.Powers;
 
 namespace ManosabaLin.Characters.Ema.Cards;
 
@@ -58,10 +60,16 @@ public sealed class Monvqiufan : ManosabaCardTemplate
             source.DynamicVars["TempDexterity"].BaseValue,
             creature, source, false);
 
-        // 获得9点格挡
-        await CreatureCmd.GainBlock(creature,
-            source.DynamicVars.Block,
-            cardPlay);
+        // 传播9点【魔女因子】：对全体存活敌人各施加9层魔女因子
+        var factorAmount = source.DynamicVars["Block"].BaseValue;
+        var enemies = creature.CombatState.Enemies
+            .Where(static e => e.IsAlive)
+            .ToArray();
+        foreach (var enemy in enemies)
+        {
+            await PowerCmd.Apply<EmaWitchFactorPower>(
+                choiceContext, enemy, factorAmount, creature, source, false);
+        }
     }
 
     protected override void OnUpgrade(ComponentContext componentContext)

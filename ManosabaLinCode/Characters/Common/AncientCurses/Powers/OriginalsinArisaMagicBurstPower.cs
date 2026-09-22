@@ -3,8 +3,6 @@ namespace ManosabaLin.Characters.Common.AncientCurses.Powers;
 [RegisterPower]
 public sealed class OriginalsinArisaMagicBurstPower : ManosabaPowerTemplate
 {
-    private bool _triggered;
-
     public override PowerType Type => PowerType.Buff;
     public override PowerStackType StackType => PowerStackType.Counter;
 
@@ -15,23 +13,25 @@ public sealed class OriginalsinArisaMagicBurstPower : ManosabaPowerTemplate
         Creature? applier,
         CardModel? cardSource)
     {
-        if (_triggered) return;
-        if (amount < 10m) return;
         if (power is not YlsmPower) return;
+        if (power.Amount < 10m) return;
         if (applier != Owner) return;
         if (power.Owner == Owner) return;
         if (!Owner.HasPower<YlsmPower>()) return;
 
-        _triggered = true;
-        await CreatureCmd.Damage(
-            choiceContext,
-            power.Owner,
-            1m,
-            ValueProp.Unblockable | ValueProp.Unpowered | ValueProp.Move,
-            cardSource,
-            null);
-        if (Owner.Player is { } player)
-            await PlayerCmd.GainEnergy(1m, player);
+        // 达到10层时立刻触发目标身上所有【紫藤亚里沙的魔法】：每层造成1点不可阻挡伤害
+        var stacks = power.Amount;
+        if (stacks > 0m)
+            await CreatureCmd.Damage(
+                choiceContext,
+                power.Owner,
+                stacks,
+                ValueProp.Unblockable | ValueProp.Unpowered | ValueProp.Move,
+                cardSource,
+                null);
+
+        // 移除目标身上所有的【紫藤亚里沙的魔法】
+        power.RemoveInternal();
     }
 
     public override async Task AfterSideTurnEnd(PlayerChoiceContext choiceContext, CombatSide side, IEnumerable<Creature> participants)

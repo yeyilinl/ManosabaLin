@@ -2,6 +2,10 @@ using ManosabaLin.Characters.Ananlin.Relics;
 
 namespace ManosabaLin.Characters.Ananlin.Powers;
 
+/// <summary>
+/// 【牢房】：每回合打出的第一张技能牌改为置于抽牌堆顶，且费用-1直到打出；
+/// 回合结束时，若敌人【已缄默】，缄默替换意图数值+1；若打出攻击牌，离开【牢房】。
+/// </summary>
 [RegisterPower]
 public sealed class AnanlinCellPower : ManosabaPowerTemplate
 {
@@ -34,38 +38,31 @@ public sealed class AnanlinCellPower : ManosabaPowerTemplate
         return Task.CompletedTask;
     }
 
-    public override async Task BeforeSideTurnEnd(PlayerChoiceContext choiceContext, CombatSide side, IEnumerable<Creature> participants)
+    public override async Task AfterCardPlayed(PlayerChoiceContext choiceContext, CardPlay cardPlay)
+    {
+        if (cardPlay.Card.Owner?.Creature != Owner) return;
+        if (cardPlay.Card.Type != CardType.Attack) return;
+
+        // 打出攻击牌，离开【牢房】
+        await PowerCmd.Remove(this);
+    }
+
+    public override async Task AfterSideTurnEnd(
+        PlayerChoiceContext choiceContext,
+        CombatSide side,
+        IEnumerable<Creature> participants)
     {
         if (side != Owner.Side) return;
-        if (Owner.Player?.Relics.OfType<AnansSketchbook>().FirstOrDefault() is { } sketchbook)
-            await sketchbook.AddSilence(choiceContext, (int)Amount, null);
-        else
-            await PowerCmd.Apply<SilentPower>(choiceContext, Owner, Amount, Owner, null);
-    }
 
-    public override async Task BeforeFlushLate(PlayerChoiceContext choiceContext, Player player)
-    {
-        if (player.Creature != Owner) return;
+        // 回合结束时，若敌人有【已缄默】，缄默替换意图数值+1
+        var combatState = Owner.CombatState;
+        if (combatState is not null && combatState.Enemies.Any(static e => e.IsAlive && e.GetPower<AnanlinSilencedPower>() is not null))
+        {
+            if (Owner.Player is { } player)
+                AnanlinSilenceIntentManager.IncreaseSilenceGrowth(player);
+        }
 
-        var retainable = PileType.Hand.GetPile(player).Cards
-            .Where(static card => !card.ShouldRetainThisTurn)
-            .ToList();
-        if (retainable.Count == 0) return;
-
-        var selected = await CardSelectCmd.FromHand(
-            choiceContext,
-            player,
-            new CardSelectorPrefs(SelectionScreenPrompt, 0, 1),
-            card => retainable.Contains(card),
-            this);
-
-        foreach (var card in selected)
-            card.GiveSingleTurnRetain();
-    }
-
-    public override async Task AfterSideTurnEnd(PlayerChoiceContext choiceContext, CombatSide side, IEnumerable<Creature> participants)
-    {
-        if (side == Owner.Side)
-            await PowerCmd.Remove(this);
+        // 然后离开【牢房】（离开后每回合重新计算）
+        await PowerCmd.Remove(this);
     }
 }

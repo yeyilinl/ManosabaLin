@@ -10,7 +10,7 @@ public sealed class AnanlinWitchFactor : ManosabaRelicTemplate
 
     protected override IEnumerable<DynamicVar> CanonicalVars =>
     [
-        new PowerVar<WithPower>("AttackGain", 20m),
+        new PowerVar<WithPower>("AttackGain", 15m),
         new PowerVar<WithPower>("SkillLoss", 10m),
         new PowerVar<WithPower>("PowerLoss", 10m)
     ];

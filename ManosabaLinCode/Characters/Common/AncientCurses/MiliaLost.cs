@@ -10,6 +10,7 @@ namespace ManosabaLin.Characters.Common.AncientCurses;
 [RegisterCard(typeof(LinCardPool))]
 public sealed class MiliaLost : LinAncientCurseCard
 {
+    public MiliaLost() : base(1) { }
 
     protected override async Task AfterCardDrawn(
         PlayerChoiceContext choiceContext,

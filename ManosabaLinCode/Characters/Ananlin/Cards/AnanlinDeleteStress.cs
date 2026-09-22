@@ -1,4 +1,5 @@
 using ManosabaLin.Characters.Ananlin.Powers;
+using ManosabaLin.Characters.Ananlin.Relics;
 
 namespace ManosabaLin.Characters.Ananlin.Cards;
 
@@ -51,8 +52,9 @@ public sealed class AnanlinDeleteStress()
             Owner.Creature,
             this);
 
-        if (this.Sketchbook() is { } sketchbook && !sketchbook.IsAttackIntent(target))
-            sketchbook.TryForgetRecordedAttack(target);
+        // 若目标有【已缄默】，缄默替换意图数值+1
+        if (target.GetPower<AnanlinSilencedPower>() is not null)
+            AnanlinSilenceIntentManager.IncreaseSilenceGrowth(Owner);
     }
 
     protected override void OnUpgrade(ComponentContext componentContext)

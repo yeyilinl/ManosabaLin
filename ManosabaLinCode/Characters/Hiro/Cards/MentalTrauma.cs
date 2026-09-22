@@ -10,7 +10,7 @@ using STS2RitsuLib.Interop.AutoRegistration;
 
 namespace ManosabaLin.Characters.Hiro.Cards;
 
-[RegisterCard(typeof(HiroCardPool))]
+[RegisterCard(typeof(HirolinCardPool))]
 [RegisterCharacterStarterCard(typeof(Hiro))]
 [RegisterArchaicToothTranscendence(typeof(Justice))]
 public class MentalTrauma : ManosabaCardTemplate

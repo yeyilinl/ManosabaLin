@@ -7,6 +7,7 @@ namespace ManosabaLin.Characters.Common.AncientCurses;
 [RegisterCard(typeof(LinCardPool))]
 public sealed class Emaregret : LinAncientCurseCard
 {
+    public Emaregret() : base(3) { }
 
     protected override IEnumerable<DynamicVar> CanonicalVars
     {

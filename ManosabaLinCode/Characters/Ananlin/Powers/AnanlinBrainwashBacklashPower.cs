@@ -11,7 +11,6 @@ public sealed class AnanlinBrainwashBacklashPower : ManosabaPowerTemplate
     internal const int BrainwashSilenceCostIncrease = 13;
 
     private const int SilenceTaxThreshold = 13;
-    private const int WitchificationOnThirdBacklash = 25;
 
     [SavedProperty] public int PendingSilenceGained { get; set; }
     [SavedProperty] public int RequiredSilenceCost { get; set; }
@@ -25,7 +24,6 @@ public sealed class AnanlinBrainwashBacklashPower : ManosabaPowerTemplate
         {
             var description = base.Description;
             description.Add(new IntVar("SilenceTaxThreshold", SilenceTaxThreshold));
-            description.Add(new PowerVar<WithPower>(WitchificationOnThirdBacklash));
             description.Add(new IntVar("NextBrainwashSilenceCost", CurrentBrainwashSilenceCost));
             description.Add(new IntVar("BacklashSilenceCostIncrease", BrainwashSilenceCostIncrease));
             return description;
@@ -35,7 +33,6 @@ public sealed class AnanlinBrainwashBacklashPower : ManosabaPowerTemplate
     protected override IEnumerable<DynamicVar> CanonicalVars =>
     [
         new IntVar("SilenceTaxThreshold", SilenceTaxThreshold),
-        new PowerVar<WithPower>(WitchificationOnThirdBacklash),
         new IntVar("NextBrainwashSilenceCost", 0),
         new IntVar("BacklashSilenceCostIncrease", BrainwashSilenceCostIncrease)
     ];
@@ -67,7 +64,7 @@ public sealed class AnanlinBrainwashBacklashPower : ManosabaPowerTemplate
             return;
         }
 
-        if (power is SilentPower && power.Owner == Owner && amount > 0 && Amount >= 3)
+        if (power is SilentPower && power.Owner == Owner && amount > 0 && Amount >= 2)
             await TaxSilenceGained(choiceContext, (int)amount);
     }
 
@@ -80,25 +77,15 @@ public sealed class AnanlinBrainwashBacklashPower : ManosabaPowerTemplate
             await LosePeace(choiceContext, 1);
 
         if (previousAmount < 2 && currentAmount >= 2)
-            await AddBlankPageToDrawPile();
-
-        if (previousAmount < 3 && currentAmount >= 3)
         {
-            await LoseAllPeace(choiceContext);
-            await PowerCmd.Apply<WithPower>(
-                choiceContext,
-                Owner,
-                WitchificationOnThirdBacklash,
-                Owner,
-                null,
-                false);
-
+            await AddBlankPageToDrawPile();
+            // 本能力为2层或以上时，洗脑开始消耗缄默
             EnterBrainwashCostMode();
         }
     }
 
     internal int CurrentBrainwashSilenceCost =>
-        Amount >= 3 ? Math.Max(BrainwashSilenceCost, RequiredSilenceCost) : 0;
+        Amount >= 2 ? Math.Max(BrainwashSilenceCost, RequiredSilenceCost) : 0;
 
     internal int BrainwashSilenceCostForDescription =>
         Math.Max(BrainwashSilenceCost, CurrentBrainwashSilenceCost);
@@ -131,13 +118,6 @@ public sealed class AnanlinBrainwashBacklashPower : ManosabaPowerTemplate
         var loss = Math.Min(amount, (int)peace.Amount);
         if (loss > 0)
             await PowerCmd.ModifyAmount(choiceContext, peace, -loss, Owner, null);
-    }
-
-    private async Task LoseAllPeace(PlayerChoiceContext choiceContext)
-    {
-        if (Owner.GetPower<AnanlinPeaceOfMindPower>() is not { } peace) return;
-        if (peace.Amount > 0)
-            await PowerCmd.ModifyAmount(choiceContext, peace, -peace.Amount, Owner, null);
     }
 
     private async Task AddBlankPageToDrawPile()

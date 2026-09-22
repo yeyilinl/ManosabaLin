@@ -35,6 +35,12 @@ internal static class SamePlaceTruthFusionPreviewPatch
             HiroCharacter.Color,
             new Color(1f, 0.42f, 0.36f, 1f)));
 
+    // 预览节点登记表：旧识疑影打出/移出战斗后，宿主卡节点可能已被引擎回收或复用，
+    // 届时无法再通过宿主 GetNodeOrNull 找到预览子节点（RemovePreview 依赖宿主仍有效），
+    // 导致打完强化后的旧识疑影时【霜覆初心】预览残留在手牌区并与其他卡拼在一起。
+    // 这里按宿主卡片引用登记已创建的预览节点，提供不依赖宿主的强制定向清理入口。
+    private static readonly Dictionary<CardModel, NCard> LivePreviewHosts = new(ReferenceEqualityComparer.Instance);
+
     [HarmonyPatch(typeof(NCard), nameof(NCard.UpdateVisuals), [typeof(PileType), typeof(CardPreviewMode)])]
     [HarmonyPostfix]
     private static void UpdateVisualsPostfix(NCard __instance)
@@ -200,6 +206,7 @@ internal static class SamePlaceTruthFusionPreviewPatch
         var preview = source.GetNodeOrNull<NCard>(PreviewNodeName);
         if (IsNodeValid(preview))
         {
+            LivePreviewHosts[source.Model!] = preview!;
             ConfigurePreview(preview!);
             preview!.Visible = true;
             EnsureFusionGlow(source);
@@ -219,6 +226,9 @@ internal static class SamePlaceTruthFusionPreviewPatch
         ConfigurePreview(preview);
         EnsureFusionGlow(source);
         preview.MoveToFront();
+
+        if (source.Model is { } model)
+            LivePreviewHosts[model] = preview;
     }
 
     private static void ConfigurePreview(NCard preview)
@@ -286,17 +296,39 @@ internal static class SamePlaceTruthFusionPreviewPatch
 
     private static void RemovePreview(NCard? source)
     {
-        if (!IsNodeValid(source))
+        if (source is { Model: { } model })
+        {
+            LivePreviewHosts.Remove(model);
+        }
+
+        if (IsNodeValid(source))
+        {
+            RemoveFusionGlow(source!);
+
+            var preview = source!.GetNodeOrNull<NCard>(PreviewNodeName);
+            if (IsNodeValid(preview))
+            {
+                preview!.QueueFree();
+            }
+        }
+    }
+
+    /// <summary>
+    /// 强制定向清理某张旧识疑影（如刚打出融合的）下挂的【霜覆初心】预览。
+    /// 此时宿主卡可能已从打出区移除、无法再通过 GetNodeOrNull 找到预览子节点，
+    /// 因此用登记表里的预览节点引用直接清理，杜绝残留手牌区。
+    /// </summary>
+    internal static void CleanupPreviewFor(CardModel model)
+    {
+        if (!LivePreviewHosts.Remove(model, out var preview))
         {
             return;
         }
 
-        RemoveFusionGlow(source!);
-
-        var preview = source!.GetNodeOrNull<NCard>(PreviewNodeName);
+        RemoveFusionGlow(preview);
         if (IsNodeValid(preview))
         {
-            preview!.QueueFree();
+            preview.QueueFree();
         }
     }
 

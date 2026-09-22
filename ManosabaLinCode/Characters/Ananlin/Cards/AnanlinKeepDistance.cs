@@ -11,14 +11,12 @@ public sealed class AnanlinKeepDistance() : ManosabaCardTemplate(1, CardType.Att
     [
         new BlockVar(8m, ValueProp.Move),
         new DamageVar(8m, ValueProp.Move),
-        new PowerVar<SilentPower>("SilenceCost", 1m),
         new PowerVar<VigorPower>("Vigor", 2m),
         new IntVar("Hits", 1)
     ];
 
     protected override IEnumerable<IHoverTip> AdditionalHoverTips =>
     [
-        HoverTipFactory.FromPower<SilentPower>(),
         HoverTipFactory.FromPower<VigorPower>()
     ];
 
@@ -28,17 +26,15 @@ public sealed class AnanlinKeepDistance() : ManosabaCardTemplate(1, CardType.Att
 
         await CreatureCmd.GainBlock(Owner.Creature, DynamicVars.Block, cardPlay);
 
-        if (this.Sketchbook() is not { } sketchbook || sketchbook.HasAnyEnemyAttackIntent())
-            return;
-
-        var spent = await sketchbook.SpendSilence(choiceContext, DynamicVars["SilenceCost"].IntValue, this);
-        if (spent == DynamicVars["SilenceCost"].IntValue)
+        if (this.Sketchbook() is { } sketchbook && !sketchbook.HasAnyEnemyAttackIntent())
+        {
             await PowerCmd.Apply<VigorPower>(
                 choiceContext,
                 Owner.Creature,
                 DynamicVars["Vigor"].BaseValue,
                 Owner.Creature,
                 this);
+        }
 
         await DamageCmd.Attack(DynamicVars.Damage.BaseValue)
             .WithHitCount(DynamicVars["Hits"].IntValue)
@@ -46,6 +42,17 @@ public sealed class AnanlinKeepDistance() : ManosabaCardTemplate(1, CardType.Att
             .Targeting(target)
             .WithHitFx("vfx/vfx_attack_blunt")
             .Execute(choiceContext);
+
+        // 若目标有【已缄默】，再攻击1次
+        if (target.GetPower<AnanlinSilencedPower>() is not null)
+        {
+            await DamageCmd.Attack(DynamicVars.Damage.BaseValue)
+                .WithHitCount(1)
+                .FromCard(this, cardPlay)
+                .Targeting(target)
+                .WithHitFx("vfx/vfx_attack_blunt")
+                .Execute(choiceContext);
+        }
     }
 
     protected override void OnUpgrade(ComponentContext componentContext)

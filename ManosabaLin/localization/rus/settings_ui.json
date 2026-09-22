@@ -21,5 +21,7 @@
   "MANOSABALIN_TELEMETRY_USAGE": "Данные об использовании",
   "MANOSABALIN_TELEMETRY_MODS": "Список модов",
   "MANOSABALIN_TELEMETRY_DIAGNOSTICS": "Диагностика",
-  "MANOSABALIN_TELEMETRY_RUNS": "История забегов"
+  "MANOSABALIN_TELEMETRY_RUNS": "История забегов",
+  "MANOSABALIN_YESNO.yes": "Да",
+  "MANOSABALIN_YESNO.no": "Нет"
 }

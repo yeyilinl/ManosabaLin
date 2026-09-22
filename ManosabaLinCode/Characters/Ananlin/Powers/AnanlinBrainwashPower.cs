@@ -1,4 +1,5 @@
 using ManosabaLin.Characters.Ananlin.Relics;
+using ManosabaLin.Characters.Hiro.Powers;
 using MegaCrit.Sts2.Core.Saves.Runs;
 using MinionLib.RightClick;
 using MinionLib.RightClick.Easy;
@@ -90,6 +91,9 @@ public sealed class AnanlinBrainwashPower : ManosabaPowerTemplate, IEasyRightCli
             backlash?.IncreaseBrainwashSilenceCostAfterPaidUse();
             RefreshRequiredSilenceCostVar();
         }
+
+        // 按中文文案：每次强制洗脑（改写成功）都获得25层【魔女化】
+        await PowerCmd.Apply<WithPower>(choiceContext, Owner, 25m, Owner, null, false);
 
         await PowerCmd.Apply<AnanlinBrainwashBacklashPower>(
             choiceContext,

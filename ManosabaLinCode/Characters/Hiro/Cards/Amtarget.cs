@@ -14,7 +14,7 @@ using System.Linq;
 
 namespace ManosabaLin.Characters.Hiro.Cards;
 
-[RegisterCard(typeof(HiroCardPool))]
+[RegisterCard(typeof(HirolinCardPool))]
 public sealed class Amtarget() : ManosabaCardTemplate(1, CardType.Power, CardRarity.Uncommon, TargetType.AnyPlayer)
 {
     protected override IEnumerable<DynamicVar> CanonicalVars => new DynamicVar[]

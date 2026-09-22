@@ -35,7 +35,7 @@ public sealed class Candle : ManosabaCardTemplate
     {
         await CreatureCmd.GainBlock(Owner.Creature, 4m, ValueProp.Move, cardPlay);
 
-        var allies = CombatState.Allies.Where(a => a is { IsAlive: true } && a != Owner.Creature).ToList();
+        var allies = CombatState.Allies.Where(a => a is { IsAlive: true }).ToList();
         if (allies.Count > 0)
         {
             var target = Owner.RunState.Rng.CombatTargets.NextItem(allies);

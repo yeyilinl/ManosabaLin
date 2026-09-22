@@ -6,6 +6,7 @@ namespace ManosabaLin.Characters.Common.AncientCurses;
 [RegisterCard(typeof(LinCardPool))]
 public sealed class NayukaJealousy : LinAncientCurseCard
 {
+    public NayukaJealousy() : base(3) { }
 
     private static readonly HashSet<CardModel> Redirecting = [];
 

@@ -23,8 +23,9 @@ public sealed class Hiroparanoid : LinAncientCurseCard
 
     public override IEnumerable<CardKeyword> CanonicalKeywords
     {
-        // 可打出，无 Unplayable
-        get { yield return CardKeyword.Exhaust; }
+        // 可打出，无 Unplayable；不声明 Exhaust 关键词（不显示"消耗"标签），
+        // 但保留"打出并消耗"的机制——在 OnPlay 末尾手动 CardCmd.Exhaust
+        get { yield break; }
     }
 
     protected override IEnumerable<DynamicVar> CanonicalVars
@@ -61,6 +62,10 @@ public sealed class Hiroparanoid : LinAncientCurseCard
         if (card == null) return;
 
         await CardCmd.Discard(choiceContext, card);
+
+        // 不出现在关键词里，但机制上"打出并消耗"：打完后将自身移入消耗堆。
+        // 单词之后再消耗，避免影响上面从手牌选牌丢弃的逻辑。
+        await CardCmd.Exhaust(choiceContext, source);
     }
 
     protected override void OnUpgrade(ComponentContext componentContext)

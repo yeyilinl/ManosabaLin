@@ -71,7 +71,7 @@ public sealed class Hirochouma : ManosabaRelicTemplate, IEasyRightClickableRelic
         Owner.Gold -= goldCost;
         Flash();
 
-        var hiroPool = ModelDb.GetById<CardPoolModel>(ModelDb.GetId(typeof(HiroCardPool)));
+        var hiroPool = ModelDb.GetById<CardPoolModel>(ModelDb.GetId(typeof(HirolinCardPool)));
         var unlockedCards = hiroPool
             .GetUnlockedCards(Owner.UnlockState, Owner.RunState.CardMultiplayerConstraint)
             .Where(c => c.Rarity != CardRarity.Basic

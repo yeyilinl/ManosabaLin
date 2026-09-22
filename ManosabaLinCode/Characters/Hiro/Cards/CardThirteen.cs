@@ -11,7 +11,7 @@ using STS2RitsuLib.Interop.AutoRegistration;
 
 namespace ManosabaLin.Characters.Hiro.Cards;
 
-[RegisterCard(typeof(HiroCardPool))]
+[RegisterCard(typeof(HirolinCardPool))]
 [RegisterCharacterStarterCard(typeof(Hiro))]
 public sealed class CardThirteen() : ManosabaCardTemplate(1, CardType.Skill, CardRarity.Basic, TargetType.Self)
 {

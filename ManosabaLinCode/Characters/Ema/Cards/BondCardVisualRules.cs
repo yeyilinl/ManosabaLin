@@ -58,6 +58,30 @@ internal static class BondCardVisualRules
         return BondCardVisualStyle.None;
     }
 
+    /// <summary>
+    /// 是否为亲近/疏远羁绊体系卡牌（含基础生成卡、双体系卡与羁绊起始卡）。
+    /// 用于"使用羁绊卡时若没有羁绊能力则自动获得羁绊能力"的统一判定。
+    /// 注意：Yalisaqinjin（Yalisabond 体系）与结局卡（EmaBadEnding/EmaTrueEnding）不在此列。
+    /// </summary>
+    internal static bool IsBondCard(CardModel card)
+    {
+        var cardType = card.GetType();
+        if (cardType == typeof(Xueqinjincard2) ||
+            Array.IndexOf(Xueqinjincard2.RandomAffinityCardTypes, cardType) >= 0)
+            return true;
+
+        if (cardType == typeof(Xueqinjincard1) ||
+            Array.IndexOf(Xueqinjincard1.RandomEstrangementCardTypes, cardType) >= 0)
+            return true;
+
+        return cardType == typeof(Emamqinjin)
+            || cardType == typeof(Emamshuyuan)
+            || cardType == typeof(BondVerdict)
+            || cardType == typeof(Emamonv)
+            || cardType == typeof(BondExchangecard)
+            || cardType == typeof(Xueshuyuancard);
+    }
+
     internal static bool ShouldUseActiveDogEarMaterial(CardModel card, BondCardVisualStyle style)
     {
         return style switch

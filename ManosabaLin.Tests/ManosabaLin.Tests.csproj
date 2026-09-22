@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net9.0</TargetFramework>
+        <ImplicitUsings>true</ImplicitUsings>
+        <LangVersion>13.0</LangVersion>
+        <Nullable>enable</Nullable>
+        <AssemblyName>ManosabaLin_tests</AssemblyName>
+        <RootNamespace>ManosabaLin.Tests</RootNamespace>
+        <RestoreSources>https://api.nuget.org/v3/index.json;$(RestoreSources)</RestoreSources>
+
+        <Sts2MainModId>ManosabaLin</Sts2MainModId>
+        <Sts2RequiredModIds>STS2-RitsuLib;MinionLib</Sts2RequiredModIds>
+        <Sts2DisableOtherMods>true</Sts2DisableOtherMods>
+        <Sts2TestModAuthor>Lin</Sts2TestModAuthor>
+        <Sts2TestModDescription>Headless combat tests for ManosabaLin.</Sts2TestModDescription>
+        <GodotProjectDir Condition="'$(GodotProjectDir)' == ''">$(MSBuildProjectDirectory)/..</GodotProjectDir>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="../ManosabaLin.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="STS2.RitsuLib" Version="0.5.20" />
+        <PackageReference Include="FuYnAloft.Sts2.MinionLib" Version="0.6.2" />
+        <PackageReference Include="TestTheSpire" Version="0.1.7" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <CompilerVisibleProperty Include="GodotProjectDir" />
+    </ItemGroup>
+</Project>

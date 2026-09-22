@@ -134,7 +134,6 @@ public sealed class AnanlinPlaywrightAndArtist() : ManosabaCardTemplate(1, CardT
             card.EnergyCost.AddThisTurnOrUntilPlayed(-1, reduceOnly: true);
 
         card.AddKeyword(CardKeyword.Retain);
-        card.AddKeyword(CardKeyword.Ethereal);
     }
 
     private static bool IsCurrentlyPlayable(CardModel card, ICombatState combatState)

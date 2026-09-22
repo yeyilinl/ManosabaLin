@@ -19,13 +19,12 @@ public sealed class AnanlinThePrisonIsHome() : ManosabaCardTemplate(1, CardType.
 
     protected override async Task OnPlay(PlayerChoiceContext choiceContext, CardPlay cardPlay, ComponentContext componentContext)
     {
-        var prison = await PowerCmd.Apply<AnanlinPrisonIsHomePower>(
+        await PowerCmd.Apply<AnanlinPrisonIsHomePower>(
             choiceContext,
             Owner.Creature,
             DynamicVars.Energy.BaseValue,
             Owner.Creature,
             this);
-        prison?.InitializeCurrentTurn(this.Sketchbook()?.AttacksPlayedThisTurn > 0);
     }
 
     protected override void OnUpgrade(ComponentContext componentContext)

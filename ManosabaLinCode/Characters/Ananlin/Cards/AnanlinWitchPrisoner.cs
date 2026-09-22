@@ -1,6 +1,7 @@
 using MinionLib.Component.Core;
 using ManosabaLin.Characters.Common;
 using ManosabaLin.Characters.Common.Powers;
+using ManosabaLin.Characters.Ananlin.Relics;
 using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.GameActions.Multiplayer;
@@ -47,6 +48,9 @@ public sealed class AnanlinWitchPrisoner() : ManosabaCardTemplate(3, CardType.Sk
             this,
             false
         );
+
+        // 敕改（二次篡改）：授权缄默本回合可再改写一次敌人意图（仅带【已缄默】的敌人可被二次篡改）
+        AnanlinSilenceIntentManager.GrantSecondTamper(Owner);
     }
 
     protected override void OnUpgrade(ComponentContext componentContext)

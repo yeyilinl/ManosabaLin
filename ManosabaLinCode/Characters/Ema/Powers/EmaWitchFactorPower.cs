@@ -49,8 +49,10 @@ public class EmaWitchFactorPower : ManosabaPowerTemplate, IHealthBarForecastSour
         if (!Owner.IsAlive) return;
         if (!ShouldDie()) return;
 
-        // 必须打到了血条（有未被格挡的伤害）
+        // 只有主动攻击造成的不受格挡伤害才触发即死
+        // （毒伤/DoT 等回合开始结算的伤害是 Unpowered，不满足 IsPoweredAttack，不会触发）
         if (result.UnblockedDamage <= 0) return;
+        if (!result.Props.IsPoweredAttack()) return;
 
         await CreatureCmd.Damage(choiceContext, Owner, Owner.CurrentHp, ValueProp.Unblockable | ValueProp.Unpowered, null, null);
     }

@@ -14,7 +14,7 @@ using System.Linq;
 
 namespace ManosabaLin.Characters.Hiro.Cards;
 
-[RegisterCard(typeof(HiroCardPool))]
+[RegisterCard(typeof(HirolinCardPool))]
 public class Lyhelp : ManosabaCardTemplate
 {
     private const int BaseEnergyCost = 2;

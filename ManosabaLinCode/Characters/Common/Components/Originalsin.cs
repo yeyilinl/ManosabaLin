@@ -29,6 +29,7 @@ public sealed partial class Originalsin : KeywordLikeComponent
     private const string CocoworryTipKey = "ManosabaLin.Originalsin.Cocoworry.hovertip.description";
     private const string ArisaGuiltTipKey = "ManosabaLin.Originalsin.ArisaGuilt.hovertip.description";
     private const string MiliaLostTipKey = "ManosabaLin.Originalsin.MiliaLost.hovertip.description";
+    private const string WitchificationCurseTipKey = "ManosabaLin.Originalsin.WitchificationCurse.hovertip.description";
 
     private const string HiroparanoidPrefixKey = "ManosabaLin.Originalsin.Hiroparanoid.prefix";
     private const string MargeCharmPrefixKey = "ManosabaLin.Originalsin.MargeCharm.prefix";
@@ -43,6 +44,7 @@ public sealed partial class Originalsin : KeywordLikeComponent
     private const string CocoworryPrefixKey = "ManosabaLin.Originalsin.Cocoworry.prefix";
     private const string ArisaGuiltPrefixKey = "ManosabaLin.Originalsin.ArisaGuilt.prefix";
     private const string MiliaLostPrefixKey = "ManosabaLin.Originalsin.MiliaLost.prefix";
+    private const string WitchificationCursePrefixKey = "ManosabaLin.Originalsin.WitchificationCurse.prefix";
 
     protected override LocString PrefixLocString => Card switch
     {
@@ -59,6 +61,7 @@ public sealed partial class Originalsin : KeywordLikeComponent
         Cocoworry => new LocString("cards", CocoworryPrefixKey),
         ArisaGuilt => new LocString("cards", ArisaGuiltPrefixKey),
         MiliaLost => new LocString("cards", MiliaLostPrefixKey),
+        WitchificationCurse => new LocString("cards", WitchificationCursePrefixKey),
         _ => base.PrefixLocString,
     };
 
@@ -81,6 +84,7 @@ public sealed partial class Originalsin : KeywordLikeComponent
                 Cocoworry => CocoworryTipKey,
                 ArisaGuilt => ArisaGuiltTipKey,
                 MiliaLost => MiliaLostTipKey,
+                WitchificationCurse => WitchificationCurseTipKey,
                 _ => null,
             };
             if (descriptionKey == null) yield break;
@@ -128,6 +132,11 @@ public sealed partial class Originalsin : KeywordLikeComponent
     public static event Action<PlayerChoiceContext, CardModel>? PunishTriggered;
 
     /// <summary>
+    /// 任意原罪触发「宽恕」后触发（含主动宽恕与卡牌自动宽恕）。
+    /// </summary>
+    public static event Action<PlayerChoiceContext, CardModel>? ForgiveTriggered;
+
+    /// <summary>
     /// 立刻触发一次本组件的「宽恕」效果，并计入本场宽恕次数。
     /// </summary>
     public async Task Forgive(PlayerChoiceContext choiceContext)
@@ -136,6 +145,8 @@ public sealed partial class Originalsin : KeywordLikeComponent
         if (owner != null)
         {
             await PowerCmd.Apply<OriginalsinForgivenessCounterPower>(
+                choiceContext, owner.Creature, 1m, owner.Creature, Card, false);
+            await PowerCmd.Apply<OriginalsinResolveCounterPower>(
                 choiceContext, owner.Creature, 1m, owner.Creature, Card, false);
         }
 
@@ -180,7 +191,13 @@ public sealed partial class Originalsin : KeywordLikeComponent
             case MiliaLost:
                 await ForgiveMiliaLost(choiceContext);
                 break;
+            case WitchificationCurse:
+                await ForgiveWitchificationCurse(choiceContext);
+                break;
         }
+
+        if (Card != null)
+            ForgiveTriggered?.Invoke(choiceContext, Card);
     }
 
     /// <summary>
@@ -188,6 +205,13 @@ public sealed partial class Originalsin : KeywordLikeComponent
     /// </summary>
     public async Task Punish(PlayerChoiceContext choiceContext)
     {
+        var owner = Card?.Owner;
+        if (owner != null)
+        {
+            await PowerCmd.Apply<OriginalsinResolveCounterPower>(
+                choiceContext, owner.Creature, 1m, owner.Creature, Card, false);
+        }
+
         switch (Card)
         {
             case Hiroparanoid:
@@ -228,6 +252,9 @@ public sealed partial class Originalsin : KeywordLikeComponent
                 break;
             case MiliaLost:
                 await PunishMiliaLost(choiceContext);
+                break;
+            case WitchificationCurse:
+                await PunishWitchificationCurse(choiceContext);
                 break;
         }
 
@@ -833,6 +860,60 @@ public sealed partial class Originalsin : KeywordLikeComponent
 
         var generated = combatState.CreateCard(template, player);
         await CardPileCmd.AddGeneratedCardToCombat(generated, PileType.Hand, player);
+    }
+
+    private async Task ForgiveWitchificationCurse(PlayerChoiceContext choiceContext)
+    {
+        var card = Card!;
+        var owner = card.Owner!;
+        var me = owner.Creature;
+
+        // 宽恕的代价：下回合开始时失去 10 魔女化（clamp 到当前层数，不扣成负数）
+        var currentWith = me.GetPower<WithPower>()?.Amount ?? 0m;
+        if (currentWith > 0m)
+        {
+            var loss = Math.Min(10m, currentWith);
+            await PowerCmd.Apply<WithPower>(choiceContext, me, -loss, me, card, false);
+        }
+
+        // 宽恕的成长：此卡下次打出获得的魔女化 +10
+        if (card.DynamicVars.TryGetValue("WitchAmount", out var witchAmount))
+            witchAmount.BaseValue += 10m;
+    }
+
+    private async Task PunishWitchificationCurse(PlayerChoiceContext choiceContext)
+    {
+        var card = Card!;
+        var owner = card.Owner!;
+        var me = owner.Creature;
+        if (me.CombatState is not { } combatState) return;
+
+        // 当前每有 50 魔女化：随机减少任意友方 20 魔女化，自己抽 1 张卡
+        var currentWith = me.GetPower<WithPower>()?.Amount ?? 0m;
+        var times = (int)(currentWith / 50m);
+        if (times <= 0) return;
+
+        var allies = combatState.Players
+            .Where(p => p.Creature.IsAlive)
+            .Select(p => p.Creature)
+            .ToList();
+        if (allies.Count == 0) return;
+
+        var rng = owner.RunState.Rng.CombatCardGeneration;
+        for (var i = 0; i < times; i++)
+        {
+            var ally = rng.NextItem(allies);
+            if (ally == null) continue;
+
+            var allyWith = ally.GetPower<WithPower>()?.Amount ?? 0m;
+            if (allyWith > 0m)
+            {
+                var loss = Math.Min(20m, allyWith);
+                await PowerCmd.Apply<WithPower>(choiceContext, ally, -loss, me, card, false);
+            }
+
+            await CardPileCmd.Draw(choiceContext, 1, owner);
+        }
     }
 
     private static decimal Half(decimal value) => Math.Max(1m, value / 2m);

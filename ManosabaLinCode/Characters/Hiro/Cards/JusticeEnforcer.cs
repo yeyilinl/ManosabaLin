@@ -17,7 +17,7 @@ using MinionLib.Component.Interfaces;
 
 namespace ManosabaLin.Characters.Hiro.Cards;
 
-[RegisterCard(typeof(HiroCardPool))]
+[RegisterCard(typeof(HirolinCardPool))]
 public sealed class JusticeEnforcer() : ManosabaCardTemplate(3, CardType.Power, CardRarity.Rare, TargetType.Self)
 {
     protected override IEnumerable<ICardComponent> CanonicalComponents => [new Executorofjustice()];

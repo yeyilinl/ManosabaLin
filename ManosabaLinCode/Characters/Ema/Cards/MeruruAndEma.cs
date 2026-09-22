@@ -77,7 +77,7 @@ public sealed class MeruruAndEma() : ManosabaCardTemplate(1, CardType.Power, Car
 
         HasAutoPlayedThisCombat = true;
         this.SetFreeIgnoringCardPlayConditions();
-        await CardCmd.AutoPlay(choiceContext, this, null, skipCardPileVisuals: true);
+        await CardCmd.AutoPlay(choiceContext, this, null);
     }
 
     protected override async Task OnPlay(

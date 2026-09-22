@@ -13,7 +13,7 @@ using STS2RitsuLib.Keywords;
 
 namespace ManosabaLin.Characters.Hiro.Cards;
 
-[RegisterCard(typeof(HiroCardPool))]
+[RegisterCard(typeof(HirolinCardPool))]
 public sealed class CardSeventyFive : ManosabaCardTemplate
 {
     public CardSeventyFive() : base(1, CardType.Attack, CardRarity.Uncommon, TargetType.AnyEnemy)

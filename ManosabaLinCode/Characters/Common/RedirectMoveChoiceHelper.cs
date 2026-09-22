@@ -43,7 +43,7 @@ internal abstract class MoveChoiceCard : CardModel
     internal string MonsterId => _choice?.MonsterId ?? string.Empty;
     internal LocString TitleOverride => new(RedirectMoveChoiceScreen.LocTable, $"{Id.Entry}.title");
     internal LocString DescriptionOverride => new(RedirectMoveChoiceScreen.LocTable, $"{Id.Entry}.description");
-    public override CardPoolModel Pool => _cardPool ?? ModelDb.CardPool<HiroCardPool>();
+    public override CardPoolModel Pool => _cardPool ?? ModelDb.CardPool<HirolinCardPool>();
     public override CardPoolModel VisualCardPool => Pool;
     public override string PortraitPath => GetIntentPortrait();
     public override IEnumerable<string> AllPortraitPaths => new[] { PortraitPath };

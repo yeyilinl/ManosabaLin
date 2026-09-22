@@ -13,7 +13,7 @@ using MegaCrit.Sts2.Core.Extensions;
 
 namespace ManosabaLin.Characters.Hiro.Cards;
 
-[RegisterCard(typeof(HiroCardPool))]
+[RegisterCard(typeof(HirolinCardPool))]
 public sealed class ElevatorTrial : ManosabaCardTemplate
 {
     private const int BaseDamage = 15;

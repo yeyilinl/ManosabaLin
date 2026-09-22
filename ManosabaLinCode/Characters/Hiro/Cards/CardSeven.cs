@@ -11,7 +11,7 @@ using STS2RitsuLib.Interop.AutoRegistration;
 
 namespace ManosabaLin.Characters.Hiro.Cards;
 
-[RegisterCard(typeof(HiroCardPool))]
+[RegisterCard(typeof(HirolinCardPool))]
 public class CardSeven() : ManosabaCardTemplate(0, CardType.Power, CardRarity.Rare, TargetType.Self)
 {
     public override bool GainsBlock => true;

@@ -45,4 +45,10 @@ public sealed class AnanlinFakeDeathAct()
         power.LostPeace = lostPeace;
         power.RewardMarginPagesOnTrigger = IsUpgraded;
     }
+
+    protected override void OnUpgrade(ComponentContext componentContext)
+    {
+        // 升级额外获得【保留】关键词
+        AddKeyword(CardKeyword.Retain);
+    }
 }

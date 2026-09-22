@@ -16,7 +16,7 @@ using STS2RitsuLib.Interop.AutoRegistration;
 
 namespace ManosabaLin.Characters.Hiro.Cards;
 
-[RegisterCard(typeof(HiroCardPool))]
+[RegisterCard(typeof(HirolinCardPool))]
 public sealed class Justice : ManosabaCardTemplate
 {
     private const string EffectHoverLocEntry = "MANOSABA_LIN_CARD_JUSTICE_EFFECT";

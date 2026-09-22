@@ -2,6 +2,7 @@
 using ManosabaLin.Characters.Common;
 using ManosabaLin.Characters.Common.Powers;
 using ManosabaLin.Characters.Sherrylin;
+using ManosabaLin.Characters.Sherrylin.Powers;
 using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.GameActions.Multiplayer;
@@ -53,10 +54,11 @@ public sealed class Sherrymonvqiufan() : ManosabaCardTemplate(3, CardType.Attack
             false
         );
 
-        await DamageCmd.Attack(source.DynamicVars.Damage.BaseValue)
-            .FromCard(source, cardPlay)
-            .Targeting(cardPlay.Target!)
-            .Execute(choiceContext);
+        // 馈窥7点【情绪】：玩家自己获得7层情绪（馈窥 = 玩家获得）
+        await PowerCmd.Apply<EmotionPower>(
+            choiceContext, source.Owner.Creature,
+            source.DynamicVars["Damage"].IntValue,
+            source.Owner.Creature, source, false);
     }
 
     protected override void OnUpgrade(ComponentContext componentContext)

@@ -1,4 +1,5 @@
 using ManosabaLin.Characters.Ananlin.Powers;
+using ManosabaLin.Characters.Ananlin.Relics;
 
 namespace ManosabaLin.Characters.Ananlin.Cards;
 
@@ -7,8 +8,7 @@ public sealed class AnanlinRhetoricalQuestion() : ManosabaCardTemplate(1, CardTy
 {
     protected override IEnumerable<DynamicVar> CanonicalVars =>
     [
-        new DamageVar(8m, ValueProp.Move),
-        new PowerVar<SilentPower>("Silence", 1m)
+        new DamageVar(8m, ValueProp.Move)
     ];
 
     protected override IEnumerable<IHoverTip> AdditionalHoverTips => [HoverTipFactory.FromPower<SilentPower>()];
@@ -23,8 +23,9 @@ public sealed class AnanlinRhetoricalQuestion() : ManosabaCardTemplate(1, CardTy
             .WithHitFx("vfx/vfx_attack_blunt")
             .Execute(choiceContext);
 
-        if (this.Sketchbook() is { } sketchbook && !sketchbook.IsAttackIntent(cardPlay.Target))
-            await sketchbook.AddSilence(choiceContext, DynamicVars["Silence"].IntValue, this);
+        // 若目标有【已缄默】，随机触发当前缄默意图池里一张卡的效果
+        if (cardPlay.Target.GetPower<AnanlinSilencedPower>() is not null)
+            await AnanlinSilenceIntentManager.TriggerRandomReplacementEffect(choiceContext, Owner);
     }
 
     protected override void OnUpgrade(ComponentContext componentContext)

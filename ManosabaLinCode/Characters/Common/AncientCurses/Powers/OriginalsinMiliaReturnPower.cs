@@ -8,6 +8,8 @@ public sealed class OriginalsinMiliaReturnPower : ManosabaPowerTemplate
     public override PowerType Type => PowerType.Buff;
     public override PowerStackType StackType => PowerStackType.None;
 
+    protected override bool IsVisibleInternal => false;
+
     public void Store(CardModel canonical) => _canonical = canonical.CanonicalInstance;
 
     public override async Task AfterPlayerTurnStart(PlayerChoiceContext choiceContext, Player player)

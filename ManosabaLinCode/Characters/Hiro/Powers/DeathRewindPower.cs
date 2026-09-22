@@ -55,10 +55,6 @@ public class DeathRewindPower : ManosabaPowerTemplate
         var withAmount = creature.GetPowerAmount<WithPower>();
         await PowerCmd.Remove<DeathRewindPower>(creature);
 
-        // 魔女化 >= 300 时，本次触发失效；不回血，让死亡流程继续。
-        if (withAmount >= 300m)
-            return;
-
         var healAmount = Math.Max(1m, withAmount);
         await CreatureCmd.Heal(creature, healAmount);
 

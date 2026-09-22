@@ -16,7 +16,7 @@ using ManosabaLin.Characters.Ema.Powers;
 
 namespace ManosabaLin.Characters.Hiro.Cards;
 
-[RegisterCard(typeof(HiroCardPool))]
+[RegisterCard(typeof(HirolinCardPool))]
 public sealed class WitchChaos : ManosabaCardTemplate
 {
     private static readonly Type[] EnemyDebuffTypes =

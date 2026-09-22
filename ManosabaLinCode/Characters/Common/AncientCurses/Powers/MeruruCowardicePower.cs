@@ -6,6 +6,8 @@ public sealed class MeruruCowardicePower : LinCurseConditionalPower<MeruruCoward
     public override PowerType Type => PowerType.Buff;
     public override PowerStackType StackType => PowerStackType.None;
 
+    protected override bool IsVisibleInternal => false;
+
     public override decimal ModifyBlockAdditive(
         Creature target,
         decimal block,

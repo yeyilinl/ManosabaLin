@@ -1,6 +1,8 @@
 using ManosabaLin.Characters.Yalisalin.Capabilities;
 using ManosabaLin.Characters.Yalisalin.Components;
+using ManosabaLin.Characters.Yalisalin.Powers;
 using ManosabaLin.Characters.Yalisalin.Relics;
+using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.Saves.Runs;
 using STS2RitsuLib.Models.Capabilities;
 
@@ -148,12 +150,10 @@ public sealed class Holdmypain()
 public sealed class Dazzlingtolerance()
     : ManosabaCardTemplate(2, CardType.Power, CardRarity.Uncommon, TargetType.Self)
 {
-    protected override Task OnPlay(PlayerChoiceContext choiceContext, CardPlay cardPlay, ComponentContext componentContext)
+    protected override async Task OnPlay(PlayerChoiceContext choiceContext, CardPlay cardPlay, ComponentContext componentContext)
     {
-        if (YalisalinFireColorSystem.TryGetHairpin(Owner, out var hairpin))
-            hairpin.EnableDazzlingTolerance();
-
-        return Task.CompletedTask;
+        // 你的包容很刺眼（独立能力 Power）：余火烧掉牌时造成伤害+格挡
+        await PowerCmd.Apply<DazzlingTolerancePower>(choiceContext, Owner.Creature, 1m, Owner.Creature, this, false);
     }
 
     protected override void OnUpgrade(ComponentContext componentContext)
@@ -166,12 +166,10 @@ public sealed class Dazzlingtolerance()
 public sealed class Burnedapology()
     : ManosabaCardTemplate(3, CardType.Power, CardRarity.Rare, TargetType.Self)
 {
-    protected override Task OnPlay(PlayerChoiceContext choiceContext, CardPlay cardPlay, ComponentContext componentContext)
+    protected override async Task OnPlay(PlayerChoiceContext choiceContext, CardPlay cardPlay, ComponentContext componentContext)
     {
-        if (YalisalinFireColorSystem.TryGetHairpin(Owner, out var hairpin))
-            hairpin.EnableBurnedApology();
-
-        return Task.CompletedTask;
+        // 把道歉烧成灰（独立能力 Power）：余火烧掉的牌先自动打出1次再烧掉
+        await PowerCmd.Apply<BurnedApologyPower>(choiceContext, Owner.Creature, 1m, Owner.Creature, this, false);
     }
 
     protected override void OnUpgrade(ComponentContext componentContext)
@@ -391,12 +389,10 @@ public sealed class Dontbringmehome()
 public sealed class Warmthshouldnotstay()
     : ManosabaCardTemplate(2, CardType.Power, CardRarity.Rare, TargetType.Self)
 {
-    protected override Task OnPlay(PlayerChoiceContext choiceContext, CardPlay cardPlay, ComponentContext componentContext)
+    protected override async Task OnPlay(PlayerChoiceContext choiceContext, CardPlay cardPlay, ComponentContext componentContext)
     {
-        if (YalisalinFireColorSystem.TryGetHairpin(Owner, out var hairpin))
-            hairpin.EnableWarmthShouldNotStay();
-
-        return Task.CompletedTask;
+        // 不该留下的温柔（独立能力 Power）：余火选择完成时随机给无余火的牌加余火
+        await PowerCmd.Apply<WarmthShouldNotStayPower>(choiceContext, Owner.Creature, 1m, Owner.Creature, this, false);
     }
 
     protected override void OnUpgrade(ComponentContext componentContext)

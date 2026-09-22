@@ -6,6 +6,7 @@ namespace ManosabaLin.Characters.Common.AncientCurses;
 [RegisterCard(typeof(LinCardPool))]
 public sealed class Hannadelusion : LinAncientCurseCard
 {
+    public Hannadelusion() : base(4) { }
 
     protected override IEnumerable<DynamicVar> CanonicalVars
     {

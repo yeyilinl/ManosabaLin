@@ -109,6 +109,11 @@ public sealed class SamePlaceTruth()
         if (SamePlaceTruthFusionState.Consume(this))
         {
             if (Owner is not { } player) return;
+
+            // 打出融合后，立即强制清理本卡下挂的【霜覆初心】预览，
+            // 避免宿主卡被移出战斗、节点回收后预览残留在手牌区与其他卡拼在一起。
+            ManosabaLin.Patches.SamePlaceTruthFusionPreviewPatch.CleanupPreviewFor(this);
+
             await SamePlacePendingTruth.PlayPendingTruthRemovalEffect(choiceContext, player, this);
             return;
         }

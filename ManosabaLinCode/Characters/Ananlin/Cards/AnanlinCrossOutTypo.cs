@@ -26,18 +26,18 @@ public sealed class AnanlinCrossOutTypo()
         var selected = (await CardSelectCmd.FromHand(
             choiceContext,
             Owner,
-            new CardSelectorPrefs(SelectionScreenPrompt, 0, 1),
+            new CardSelectorPrefs(SelectionScreenPrompt, 1, 1),
             null,
             this)).FirstOrDefault();
         if (selected is null) return;
 
-        var isStatusOrCurse = AnanlinCardHelpers.IsStatusOrCurse(selected);
         await CardCmd.Exhaust(choiceContext, selected);
 
-        if (!isStatusOrCurse) return;
-
-        await CreatureCmd.GainBlock(Owner.Creature, DynamicVars.Block, cardPlay);
         await this.AddSilence(choiceContext, DynamicVars["Silence"].IntValue);
+
+        // 若敌人意图为不攻击，获得下回合格挡
+        if (this.Sketchbook() is { } sketchbook && !sketchbook.HasAnyEnemyAttackIntent())
+            await PowerCmd.Apply<BlockNextTurnPower>(choiceContext, Owner.Creature, DynamicVars.Block.BaseValue, Owner.Creature, this);
     }
 
     protected override void OnUpgrade(ComponentContext componentContext)

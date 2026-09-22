@@ -118,7 +118,7 @@ public sealed class TeamCardExchangeEvent : ModEventTemplate
     private static bool IsManosabaMainCharacter(Player player)
     {
         var cardPool = player.Character.CardPool;
-        return cardPool is HiroCardPool or EmalinCardPool or SherrylinCardPool
+        return cardPool is HirolinCardPool or EmalinCardPool or SherrylinCardPool
             or AnanlinCardPool or YalisalinCardPool;
     }
 }

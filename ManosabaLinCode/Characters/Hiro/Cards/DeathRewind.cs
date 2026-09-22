@@ -12,7 +12,7 @@ using STS2RitsuLib.Interop.AutoRegistration;
 
 namespace ManosabaLin.Characters.Hiro.Cards;
 
-[RegisterCard(typeof(HiroCardPool))]
+[RegisterCard(typeof(HirolinCardPool))]
 public class DeathRewind() : ManosabaCardTemplate(3, CardType.Power, CardRarity.Ancient, TargetType.Self)
 {
     protected override IEnumerable<IHoverTip> AdditionalHoverTips

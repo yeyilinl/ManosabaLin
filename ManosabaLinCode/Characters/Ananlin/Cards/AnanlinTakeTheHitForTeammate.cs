@@ -41,7 +41,21 @@ public sealed class AnanlinTakeTheHitForTeammate()
 
         var beforeCount = CombatManager.Instance.History.Entries.Count();
         var move = monster.NextMove;
-        await move.PerformMove([Owner.Creature]);
+
+        // 只对安安自己执行一次怪物攻击：构造单目标攻击，避免原始动作（AOE/多目标）打全体
+        var totalDamage = 0;
+        foreach (var intent in move.Intents)
+        {
+            if (intent is AttackIntent attackIntent)
+                totalDamage += attackIntent.GetTotalDamage([Owner.Creature], monster.Creature);
+        }
+
+        if (totalDamage <= 0) return;
+
+        await DamageCmd.Attack(totalDamage)
+            .FromMonster(monster)
+            .Targeting(Owner.Creature)
+            .Execute(choiceContext);
         monster.MoveStateMachine?.OnMovePerformed(move);
         CombatManager.Instance.History.MonsterPerformedMove(CombatState, monster, move, [Owner.Creature]);
 
@@ -58,7 +72,8 @@ public sealed class AnanlinTakeTheHitForTeammate()
         if (thorns > 0)
             await PowerCmd.Apply<ThornsPower>(choiceContext, Owner.Creature, thorns, Owner.Creature, this);
 
-        var hitCount = blockedResults.Length;
+        // 挡了多少点伤害，就变成多少段 1 点伤害（如挡了 3 点 → 3 段 × 1 点）
+        var hitCount = (int)totalBlocked;
         if (hitCount <= 0) return;
 
         monster.SetMoveImmediate(CreateOneDamageMove(monster, monster.NextMove, hitCount), forceTransition: true);

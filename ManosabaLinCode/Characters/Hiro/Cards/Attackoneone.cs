@@ -19,7 +19,7 @@ using Godot;
 
 namespace ManosabaLin.Characters.Hiro.Cards;
 
-[RegisterCard(typeof(HiroCardPool))]
+[RegisterCard(typeof(HirolinCardPool))]
 public sealed class Attackoneone : ManosabaCardTemplate
 {
     private const int BaseDamage = 7;

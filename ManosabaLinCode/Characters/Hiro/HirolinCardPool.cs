@@ -7,7 +7,7 @@ using STS2RitsuLib.Utils;
 namespace ManosabaLin.Characters.Hiro;
 
 // 定义希罗角色卡牌池的标题、能量图标和卡背配色参数。
-public class HiroCardPool : TypeListCardPoolModel, IModColorfulPhilosophersCardPool
+public class HirolinCardPool : TypeListCardPoolModel, IModColorfulPhilosophersCardPool
 {
 	private const string CharacterIdLower = "hiro";
 

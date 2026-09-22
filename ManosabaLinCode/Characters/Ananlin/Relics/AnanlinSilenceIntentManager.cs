@@ -3,6 +3,7 @@ using HarmonyLib;
 using ManosabaLin.Characters.Ananlin.Cards;
 using ManosabaLin.Characters.Ananlin.Powers;
 using MegaCrit.Sts2.Core.Entities.Creatures;
+using MegaCrit.Sts2.Core.Entities.Powers;
 using MegaCrit.Sts2.Core.MonsterMoves.Intents;
 using MegaCrit.Sts2.Core.MonsterMoves.MonsterMoveStateMachine;
 using MegaCrit.Sts2.Core.Models.Powers;
@@ -43,6 +44,8 @@ internal static class AnanlinSilenceIntentManager
     private static readonly Dictionary<MoveState, MoveState> BaseMovesByReplacement = [];
     private static readonly Dictionary<Player, HashSet<ReplacementIntentKind>> UsedReplacementIntentsByPlayer = [];
     private static readonly Dictionary<Player, int> RewritesThisCombatByPlayer = [];
+    private static readonly Dictionary<Player, int> SilenceGrowthByPlayer = [];
+    private static readonly Dictionary<Player, int> SecondTamperAllowanceByPlayer = [];
 
     [ThreadStatic] private static bool _isApplyingReplacement;
 
@@ -66,10 +69,37 @@ internal static class AnanlinSilenceIntentManager
         foreach (var enemy in enemies)
         {
             if (enemy.Monster is not { } monster) continue;
-            if (IsReplacementMove(monster.NextMove)) continue;
+
+            // 二次篡改：当前意图已是替换意图的敌人，仅当带【已缄默】且本回合有授权时，可再改写一次（授权按玩家回合刷新）
+            if (IsReplacementMove(monster.NextMove))
+            {
+                if (!HasSecondTamperAllowance(owner)
+                    || enemy.GetPower<AnanlinSilencedPower>() is not { } silenced
+                    || ResolveBaseMove(monster.NextMove) is null)
+                    continue;
+
+                // 先立刻触发第一次篡改后的意图效果，再选择替换意图
+                ConsumeSecondTamper(owner);
+                await monster.PerformMove();
+
+                // 二次篡改后，魔法影响次数归零（描述显示"已被魔法影响0次"）；标记本身留待敌方回合开始自行移除
+                silenced.MagicInfluenceRemaining = 0;
+
+                if (enemy.IsAlive)
+                    replacementTargets.Add(enemy);
+                continue;
+            }
 
             var currentMove = ResolveBaseMove(monster.NextMove);
             if (currentMove is null || !CanForceNow(monster, currentMove)) continue;
+
+            // 缄默压制：敌人永久失去1点力量，并留下【被缄默】标记（无效果，敌人回合开始移除）
+            await PowerCmd.Apply<StrengthPower>(choiceContext, enemy, -1m, owner.Creature, null);
+            await PowerCmd.Apply<AnanlinSilencedPower>(choiceContext, enemy, 1m, owner.Creature, null);
+
+            // 牢房才是家：本回合给予敌人【已【已缄默】时，进入【牢房】
+            if (owner.Creature.GetPower<AnanlinPrisonIsHomePower>() is { } prison)
+                await prison.TryEnterCellOnSilencedGiven(choiceContext);
 
             MarkForced(monster, currentMove);
             monster.SetMoveImmediate(currentMove, forceTransition: true);
@@ -81,14 +111,17 @@ internal static class AnanlinSilenceIntentManager
 
         if (replacementTargets.Count == 0) return [];
 
-        var selectedBuff = await ChoosePlayerBuffIntent(choiceContext, owner);
+        var (baseBonus, multiplier) = GetSilencePoolValues(owner);
+        var selectedBuff = await ChoosePlayerBuffIntent(choiceContext, owner, baseBonus, multiplier);
         if (selectedBuff is null) return [];
 
         var rewrittenTargets = new List<Creature>();
         foreach (var enemy in replacementTargets.Where(static e => e.IsAlive))
         {
             if (enemy.Monster is not { } monster) continue;
-            if (ApplyReplacementMove(monster, selectedBuff.Move))
+            // 二次篡改目标当前意图仍是替换意图，需要允许覆盖既有替换
+            var replaceExisting = IsReplacementMove(monster.NextMove);
+            if (ApplyReplacementMove(monster, selectedBuff.Move, replaceExisting))
                 rewrittenTargets.Add(enemy);
         }
 
@@ -96,6 +129,8 @@ internal static class AnanlinSilenceIntentManager
         {
             MarkReplacementIntentUsed(owner, selectedBuff.Kind);
             RewritesThisCombatByPlayer[owner] = GetRewritesThisCombat(owner) + rewrittenTargets.Count;
+            // 缄默成长：每次缄默替换意图后，下一次缄默替换意图数值+1（洗脑不受影响）
+            SilenceGrowthByPlayer[owner] = GetSilenceGrowth(owner) + 1;
             if (owner.Creature.GetPower<AnanlinSealedPagePower>() is { } sealedPage)
                 await sealedPage.AfterSilenceRightClickRewrite(choiceContext);
         }
@@ -123,7 +158,8 @@ internal static class AnanlinSilenceIntentManager
         var targets = GetBrainwashTargets(owner);
         if (targets.Count == 0) return [];
 
-        var selectedBuff = await ChoosePlayerBuffIntent(choiceContext, owner);
+        // 洗脑：始终使用默认初始替换意图数值，不随缄默成长；但吃无声扩音（特殊卡写明：公共替换意图池倍率+1）
+        var selectedBuff = await ChoosePlayerBuffIntent(choiceContext, owner, 0, GetReplacementValueMultiplier(owner));
         if (selectedBuff is null) return [];
 
         if (beforeApply is not null && !await beforeApply())
@@ -158,7 +194,8 @@ internal static class AnanlinSilenceIntentManager
         if (targets.Length == 0) return 0;
 
         var kind = owner.RunState.Rng.CombatCardGeneration.NextItem(ReplacementIntentCycle);
-        var move = CreateReplacementMove(owner, kind);
+        var (baseBonus, multiplier) = GetSilencePoolValues(owner);
+        var move = CreateReplacementMove(owner, kind, baseBonus, multiplier);
 
         var rewriteCount = 0;
         foreach (var target in targets)
@@ -191,10 +228,19 @@ internal static class AnanlinSilenceIntentManager
         var combatState = owner.Creature.CombatState;
         if (combatState is null) return false;
 
+        var hasSecondTamper = HasSecondTamperAllowance(owner);
+
         foreach (var enemy in combatState.Enemies.Where(static c => c.IsAlive))
         {
             if (enemy.Monster is not { NextMove: { } nextMove } monster) continue;
-            if (IsReplacementMove(nextMove)) continue;
+
+            // 二次篡改：当前意图已是替换意图、带【已缄默】且本回合有授权 → 可再改写一次
+            if (IsReplacementMove(nextMove))
+            {
+                if (hasSecondTamper && enemy.GetPower<AnanlinSilencedPower>() is not null)
+                    return true;
+                continue;
+            }
 
             var currentMove = ResolveBaseMove(nextMove);
             if (currentMove is not null && CanForceNow(monster, currentMove))
@@ -272,6 +318,8 @@ internal static class AnanlinSilenceIntentManager
         BaseMovesByReplacement.Clear();
         UsedReplacementIntentsByPlayer.Clear();
         RewritesThisCombatByPlayer.Clear();
+        SilenceGrowthByPlayer.Clear();
+        SecondTamperAllowanceByPlayer.Clear();
     }
 
     internal static bool TryForgetRecordedAttack(Creature target)
@@ -314,7 +362,11 @@ internal static class AnanlinSilenceIntentManager
         }
     }
 
-    private static async Task<ReplacementIntentChoice?> ChoosePlayerBuffIntent(PlayerChoiceContext choiceContext, Player owner)
+    private static async Task<ReplacementIntentChoice?> ChoosePlayerBuffIntent(
+        PlayerChoiceContext choiceContext,
+        Player owner,
+        int baseBonus,
+        int multiplier)
     {
         if (owner.Creature.CombatState is not { } combatState) return null;
 
@@ -322,7 +374,7 @@ internal static class AnanlinSilenceIntentManager
         if (availableKinds.Length == 0) return null;
 
         var options = availableKinds
-            .Select(kind => CreateReplacementOptionCard(kind, combatState, owner))
+            .Select(kind => CreateReplacementOptionCard(kind, combatState, owner, baseBonus, multiplier))
             .ToArray();
 
         var selected = (await CardSelectCmd.FromSimpleGrid(
@@ -337,7 +389,7 @@ internal static class AnanlinSilenceIntentManager
         var selectedKind = GetReplacementIntentKind(selected);
         if (selectedKind is null) return null;
 
-        return new ReplacementIntentChoice(selectedKind.Value, CreateReplacementMove(owner, selectedKind.Value));
+        return new ReplacementIntentChoice(selectedKind.Value, CreateReplacementMove(owner, selectedKind.Value, baseBonus, multiplier));
     }
 
     private static IEnumerable<ReplacementIntentKind> GetAvailableReplacementIntentKinds(Player owner)
@@ -365,7 +417,9 @@ internal static class AnanlinSilenceIntentManager
     private static CardModel CreateReplacementOptionCard(
         ReplacementIntentKind kind,
         ICombatState combatState,
-        Player owner)
+        Player owner,
+        int baseBonus,
+        int multiplier)
     {
         CardModel card = kind switch
         {
@@ -376,25 +430,25 @@ internal static class AnanlinSilenceIntentManager
             _ => combatState.CreateCard<AnanlinSilenceIntentBlockOption>(owner)
         };
 
-        ApplyReplacementOptionValue(card, kind, GetReplacementValueMultiplier(owner));
+        ApplyReplacementOptionValue(card, kind, baseBonus, multiplier);
         return card;
     }
 
-    private static void ApplyReplacementOptionValue(CardModel card, ReplacementIntentKind kind, int multiplier)
+    private static void ApplyReplacementOptionValue(CardModel card, ReplacementIntentKind kind, int baseBonus, int multiplier)
     {
         switch (kind)
         {
             case ReplacementIntentKind.Energy:
-                card.DynamicVars.Energy.BaseValue = BaseEnergy * multiplier;
+                card.DynamicVars.Energy.BaseValue = (BaseEnergy + baseBonus) * multiplier;
                 break;
             case ReplacementIntentKind.Draw:
-                card.DynamicVars.Cards.BaseValue = BaseDraw * multiplier;
+                card.DynamicVars.Cards.BaseValue = (BaseDraw + baseBonus) * multiplier;
                 break;
             case ReplacementIntentKind.Block:
-                card.DynamicVars.Block.BaseValue = BaseBlock * multiplier;
+                card.DynamicVars.Block.BaseValue = (BaseBlock + baseBonus) * multiplier;
                 break;
             case ReplacementIntentKind.Vigor:
-                card.DynamicVars["VigorPower"].BaseValue = BaseVigor * multiplier;
+                card.DynamicVars["VigorPower"].BaseValue = (BaseVigor + baseBonus) * multiplier;
                 break;
         }
     }
@@ -411,30 +465,29 @@ internal static class AnanlinSilenceIntentManager
         };
     }
 
-    private static MoveState CreateReplacementMove(Player owner, ReplacementIntentKind kind)
+    private static MoveState CreateReplacementMove(Player owner, ReplacementIntentKind kind, int baseBonus, int multiplier)
     {
-        var multiplier = GetReplacementValueMultiplier(owner);
         return kind switch
         {
             ReplacementIntentKind.Energy => new MoveState(
                 EnergyMoveId,
-                async _ => await ApplyEnergyToAllPlayers(owner, BaseEnergy * multiplier),
+                async _ => await ApplyEnergyToAllPlayers(owner, (BaseEnergy + baseBonus) * multiplier),
                 new BuffIntent()),
             ReplacementIntentKind.Draw => new MoveState(
                 DrawMoveId,
-                async _ => await DrawForAllPlayers(owner, BaseDraw * multiplier),
+                async _ => await DrawForAllPlayers(owner, (BaseDraw + baseBonus) * multiplier),
                 new BuffIntent()),
             ReplacementIntentKind.Block => new MoveState(
                 BlockMoveId,
-                async _ => await ApplyBlockNextTurnToAllPlayers(owner, BaseBlock * multiplier),
+                async _ => await ApplyBlockNextTurnToAllPlayers(owner, (BaseBlock + baseBonus) * multiplier),
                 new DefendIntent()),
             ReplacementIntentKind.Vigor => new MoveState(
                 VigorMoveId,
-                async _ => await ApplyVigorToAllPlayers(owner, BaseVigor * multiplier),
+                async _ => await ApplyVigorToAllPlayers(owner, (BaseVigor + baseBonus) * multiplier),
                 new BuffIntent()),
             _ => new MoveState(
                 BlockMoveId,
-                async _ => await ApplyBlockNextTurnToAllPlayers(owner, BaseBlock * multiplier),
+                async _ => await ApplyBlockNextTurnToAllPlayers(owner, (BaseBlock + baseBonus) * multiplier),
                 new DefendIntent())
         };
     }
@@ -483,21 +536,93 @@ internal static class AnanlinSilenceIntentManager
         return owner.Creature.GetPower<AnanlinSilentAmplificationPower>()?.ReplacementValueMultiplier ?? 1;
     }
 
+    internal static int GetSilenceGrowth(Player owner)
+    {
+        return SilenceGrowthByPlayer.GetValueOrDefault(owner);
+    }
+
+    /// <summary>缄默替换意图数值 +N（删去重音、牢房【牢房】回合末等用）。</summary>
+    internal static void IncreaseSilenceGrowth(Player owner, int amount = 1)
+    {
+        SilenceGrowthByPlayer[owner] = GetSilenceGrowth(owner) + amount;
+    }
+
+    // ========== 二次篡改授权（魔女囚犯） ==========
+    // 让缄默本回合可以再改写一次敌人意图。授权次数按玩家回合刷新（AnansSketchbook.AfterPlayerTurnStart）。
+    internal static int GetSecondTamperAllowance(Player owner)
+    {
+        return SecondTamperAllowanceByPlayer.GetValueOrDefault(owner);
+    }
+
+    internal static bool HasSecondTamperAllowance(Player owner)
+    {
+        return GetSecondTamperAllowance(owner) > 0;
+    }
+
+    /// <summary>授权一次二次篡改：缄默本回合可再多改写一次敌人意图。</summary>
+    internal static void GrantSecondTamper(Player owner)
+    {
+        SecondTamperAllowanceByPlayer[owner] = GetSecondTamperAllowance(owner) + 1;
+    }
+
+    private static void ConsumeSecondTamper(Player owner)
+    {
+        var remaining = GetSecondTamperAllowance(owner) - 1;
+        if (remaining <= 0)
+            SecondTamperAllowanceByPlayer.Remove(owner);
+        else
+            SecondTamperAllowanceByPlayer[owner] = remaining;
+    }
+
+    internal static void ResetSecondTamperAllowances()
+    {
+        SecondTamperAllowanceByPlayer.Clear();
+    }
+
+    /// <summary>随机触发当前缄默意图池里一张卡的效果（对持有者执行，不弹 UI、不改怪物意图）。</summary>
+    internal static async Task TriggerRandomReplacementEffect(PlayerChoiceContext choiceContext, Player owner)
+    {
+        var kind = owner.RunState.Rng.CombatCardGeneration.NextItem(ReplacementIntentCycle);
+        var (baseBonus, multiplier) = GetSilencePoolValues(owner);
+        switch (kind)
+        {
+            case ReplacementIntentKind.Energy:
+                await PowerCmd.Apply<EnergyNextTurnPower>(choiceContext, owner.Creature, (BaseEnergy + baseBonus) * multiplier, owner.Creature, null);
+                break;
+            case ReplacementIntentKind.Draw:
+                await CardPileCmd.Draw(choiceContext, (BaseDraw + baseBonus) * multiplier, owner);
+                break;
+            case ReplacementIntentKind.Block:
+                await PowerCmd.Apply<BlockNextTurnPower>(choiceContext, owner.Creature, (BaseBlock + baseBonus) * multiplier, owner.Creature, null);
+                break;
+            case ReplacementIntentKind.Vigor:
+                await PowerCmd.Apply<VigorPower>(choiceContext, owner.Creature, (BaseVigor + baseBonus) * multiplier, owner.Creature, null);
+                break;
+        }
+    }
+
+    /// <summary>将随机一张当前缄默替换意图牌加入手牌，数值 = 当前意图池数值且固定（全文替换用）。</summary>
+    internal static async Task<CardModel?> AddRandomReplacementIntentCardToHand(PlayerChoiceContext choiceContext, Player owner)
+    {
+        if (owner.Creature.CombatState is not { } combatState) return null;
+
+        var kind = owner.RunState.Rng.CombatCardGeneration.NextItem(ReplacementIntentCycle);
+        var (baseBonus, multiplier) = GetSilencePoolValues(owner);
+        var card = CreateReplacementOptionCard(kind, combatState, owner, baseBonus, multiplier);
+        await CardPileCmd.AddGeneratedCardToCombat(card, PileType.Hand, owner);
+        return card;
+    }
+
+    /// <summary>缄默替换意图池数值：初始值 + 本场缄默成长次数，倍率来自无声扩音。</summary>
+    private static (int BaseBonus, int Multiplier) GetSilencePoolValues(Player owner)
+    {
+        return (GetSilenceGrowth(owner), GetReplacementValueMultiplier(owner));
+    }
+
     private static bool CanForceNow(MonsterModel monster, MoveState move)
     {
-        var phaseKey = GetPhaseKey(monster);
-        if (!PhaseKeys.TryGetValue(monster.Creature, out var knownPhase) || knownPhase != phaseKey)
-        {
-            PhaseKeys[monster.Creature] = phaseKey;
-            UsedMovesByPhase[monster.Creature] = [];
-        }
-
-        var used = UsedMovesByPhase[monster.Creature];
-        var phaseMoves = GetPhaseMoveIds(monster);
-        if (phaseMoves.Count > 0 && used.Count >= phaseMoves.Count)
-            used.Clear();
-
-        return !used.Contains(move.StateId);
+        // 不再限制：每个动作一阶段内最多被强制一次的限制已移除，恒可强制。
+        return true;
     }
 
     private static void MarkForced(MonsterModel monster, MoveState move)

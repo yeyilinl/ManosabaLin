@@ -1,4 +1,5 @@
-﻿using ManosabaLin.Characters.Common.Components;
+﻿using ManosabaLin.Characters.Common.AncientCurses;
+using ManosabaLin.Characters.Common.Components;
 
 namespace ManosabaLin.Characters.Yalisalin.Cards;
 
@@ -22,19 +23,46 @@ public sealed class SinMarket() : ManosabaCardTemplate(2, CardType.Skill, CardRa
         var rng = owner.RunState.Rng.CombatCardGeneration;
 
         var pool = PileType.Hand.GetPile(owner).Cards
-            .Concat(PileType.Draw.GetPile(owner).Cards)
-            .Concat(PileType.Discard.GetPile(owner).Cards)
-            .Where(c => c.HasComponent<Originalsin>())
-            .Distinct()
-            .ToList();
-        if (pool.Count == 0) return;
+        	.Concat(PileType.Draw.GetPile(owner).Cards)
+        	.Concat(PileType.Discard.GetPile(owner).Cards)
+        	.Where(c => c.HasComponent<Originalsin>())
+        	.Distinct()
+        	.ToList();
 
-        var count = Math.Min(DynamicVars["SelectCount"].IntValue, pool.Count);
+        var selectCount = DynamicVars["SelectCount"].IntValue;
+
+        // 若不足所需数量，可选择随机获得带原罪的原罪诅咒入手凑够
+        while (pool.Count < selectCount)
+        {
+            var sin = AncientSinCardCatalog.CreateRandom(CombatState, owner, rng);
+            sin.TryAddComponent(new Originalsin());
+
+            // "是/否"选卡界面：选中"是"才入手凑够
+            var take = await YesNoChoiceScreen.Pick(
+                choiceContext,
+                owner,
+                new LocString("cards", $"{Id.Entry}.yesNoPrompt"),
+                YesNoChoiceScreen.Yes,
+                YesNoChoiceScreen.No);
+
+            if (take)
+            {
+                await CardPileCmd.AddGeneratedCardToCombat(sin, PileType.Hand, owner);
+                pool.Add(sin);
+            }
+            else
+            {
+                // 选"否"：sin 从未入堆（临时卡），无需任何清理；放弃补齐
+                break;
+            }
+        }
+
+        var count = Math.Min(selectCount, pool.Count);
         var chosen = (await CardSelectCmd.FromSimpleGrid(
-            choiceContext,
-            pool,
-            owner,
-            new CardSelectorPrefs(SelectionScreenPrompt, count, count))).ToList();
+        	choiceContext,
+        	pool,
+        	owner,
+        	new CardSelectorPrefs(SelectionScreenPrompt, count, count))).ToList();
 
         foreach (var card in chosen)
         {

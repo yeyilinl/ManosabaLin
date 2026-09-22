@@ -6,6 +6,7 @@ namespace ManosabaLin.Characters.Common.AncientCurses;
 [RegisterCard(typeof(LinCardPool))]
 public sealed class NoahEnsnare : LinAncientCurseCard
 {
+    public NoahEnsnare() : base(1) { }
 
     protected override IEnumerable<DynamicVar> CanonicalVars
     {

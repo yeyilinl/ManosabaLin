@@ -13,7 +13,7 @@ using MegaCrit.Sts2.Core.Helpers;
 
 namespace ManosabaLin.ManosabaLinCode.Characters.Hiro.Cards;
 
-[RegisterCard(typeof(HiroCardPool))]
+[RegisterCard(typeof(HirolinCardPool))]
 public class Aam : ManosabaCardTemplate
 {
     private const int BaseEnergyCost = 2;

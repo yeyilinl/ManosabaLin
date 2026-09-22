@@ -13,7 +13,7 @@ using STS2RitsuLib.Keywords;
 
 namespace ManosabaLin.Characters.Hiro.Cards;
 
-[RegisterCard(typeof(HiroCardPool))]
+[RegisterCard(typeof(HirolinCardPool))]
 public sealed class Threehiro : ManosabaCardTemplate
 {
     public Threehiro() : base(2, CardType.Power, CardRarity.Rare, TargetType.Self)

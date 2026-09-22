@@ -16,7 +16,7 @@ using ManosabaLin.ManosabaLinCode.Characters.Hiro.Cards;
 
 namespace ManosabaLin.Characters.Hiro.Cards;
 
-[RegisterCard(typeof(HiroCardPool))]
+[RegisterCard(typeof(HirolinCardPool))]
 public sealed class Powerthreethreecard() : ManosabaCardTemplate(1, CardType.Power, CardRarity.Rare, TargetType.AnyPlayer)
 {
     private const string LyXlEffectHoverLocEntry = "MANOSABA_LIN_CARD_LY_XL_EFFECT";

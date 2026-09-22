@@ -10,7 +10,7 @@ using System.Collections.Generic;
 
 namespace ManosabaLin.Characters.Hiro.Cards;
 
-[RegisterCard(typeof(HiroCardPool))]
+[RegisterCard(typeof(HirolinCardPool))]
 public sealed class Seven() : ManosabaCardTemplate(1, CardType.Skill, CardRarity.Uncommon, TargetType.AllAllies)
 {
     public override IEnumerable<CardKeyword> CanonicalKeywords

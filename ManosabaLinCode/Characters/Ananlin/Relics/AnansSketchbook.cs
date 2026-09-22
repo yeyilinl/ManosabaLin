@@ -82,6 +82,7 @@ public class AnansSketchbook : ManosabaRelicTemplate
         SkillsPlayedThisTurn = 0;
         PeaceLostThisTurn = false;
         _pendingReassuranceMatchType = null;
+        AnanlinSilenceIntentManager.ResetSecondTamperAllowances();
         await OfferFirstCombatRecordReward(choiceContext);
         await AddSilence(choiceContext, 1, null);
         AssignReassuranceMark();

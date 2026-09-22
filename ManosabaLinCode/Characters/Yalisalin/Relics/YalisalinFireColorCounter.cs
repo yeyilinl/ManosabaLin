@@ -29,8 +29,9 @@ public partial class YalisalinFireColorCounter : Control
     private YalisalinFireColor?[] _slotColors = [];
     private string _lastSignature = string.Empty;
     private int _hoveredSlotIndex = -1;
+    private bool _picking;
     private TaskCompletionSource<int?>? _slotCompletion;
-    private readonly List<Button> _insertSlotButtons = [];
+    private readonly List<ColorRect> _pickHighlights = [];
 
     public override void _Ready()
     {
@@ -48,6 +49,7 @@ public partial class YalisalinFireColorCounter : Control
         NHoverTipSet.Remove(this);
         foreach (var slot in _slots)
             NHoverTipSet.Remove(slot);
+        ClearPickHighlights();
     }
 
     public void SetContext(Player viewer, Creature target)
@@ -58,7 +60,8 @@ public partial class YalisalinFireColorCounter : Control
     }
 
     /// <summary>
-    /// 进入"选择插入位置"模式：玩家点击量表的格子间位置，返回 (目标, 插入位置)。
+    /// 进入"选择插入位置"模式：直接点击敌人火色量表自带的格子，把封存火色插到该位置。
+    /// 返回 (目标, 插入位置)。点空格子或空量表第一位后取消。
     /// </summary>
     public async Task<(Creature Target, int SlotIndex)?> PickInsertSlot(LocString prompt)
     {
@@ -66,68 +69,83 @@ public partial class YalisalinFireColorCounter : Control
             return null;
 
         _slotCompletion = new TaskCompletionSource<int?>();
+        _picking = true;
 
         var tip = new Label
         {
             Text = prompt.GetFormattedText(),
-            Position = new Vector2(-LeftPadding - 170f, -24f),
-            Size = new Vector2(220f, 20f),
+            Position = new Vector2(-LeftPadding - 170f, -30f),
+            Size = new Vector2(220f, 26f),
             ZIndex = 30,
+            AutowrapMode = TextServer.AutowrapMode.WordSmart,
             Modulate = new Color(1f, 1f, 1f)
         };
         AddChild(tip);
 
-        BuildInsertSlotButtons();
+        ShowPickHighlights();
 
         var result = await _slotCompletion.Task;
-        ClearInsertSlotButtons();
+        _picking = false;
+        ClearPickHighlights();
         tip.QueueFree();
         return result is { } picked ? (_target, picked) : null;
     }
 
-    /// <summary>取消正在进行的选格模式（清理按钮与提示）。</summary>
+    /// <summary>取消正在进行的选格模式（清理高亮与提示）。</summary>
     public void CancelPickInsertSlot()
     {
+        _picking = false;
+        ClearPickHighlights();
         _slotCompletion?.TrySetResult(null);
     }
 
-    private void BuildInsertSlotButtons()
+    /// <summary>选格模式下高亮全部可点击的量表格子（含已有火色格与空格子）。</summary>
+    private void ShowPickHighlights()
     {
-        ClearInsertSlotButtons();
+        ClearPickHighlights();
 
-        var count = GetVisibleSegments().Count;
-        for (var i = 0; i <= count; i++)
+        for (var i = 0; i < _slots.Length; i++)
         {
-            var captured = i;
-            var button = new Button
+            var highlight = new ColorRect
             {
-                Name = $"InsertSlot{i}",
-                Text = "+",
-                Flat = true,
-                Position = new Vector2(0f, i * (SlotSize + SlotGap) - SlotSize / 2f),
-                Size = new Vector2(SlotSize, SlotSize),
-                MouseFilter = MouseFilterEnum.Stop,
-                ZIndex = 25,
-                FocusMode = FocusModeEnum.None,
-                Modulate = new Color(1f, 0.92f, 0.55f, 0.9f)
+                Name = $"PickHighlight{i}",
+                Color = new Color(1f, 0.85f, 0.4f, 0.35f),
+                Position = _slots[i].Position,
+                Size = _slots[i].Size,
+                MouseFilter = MouseFilterEnum.Ignore,
+                ZIndex = 26,
+                Visible = true
             };
-            button.Pressed += () => OnInsertSlotChosen(captured);
-            AddChild(button);
-            _insertSlotButtons.Add(button);
+            AddChild(highlight);
+            _pickHighlights.Add(highlight);
         }
     }
 
-    private void ClearInsertSlotButtons()
+    /// <summary>清除选格模式的高亮层。</summary>
+    private void ClearPickHighlights()
     {
-        foreach (var button in _insertSlotButtons)
-            button.QueueFree();
+        foreach (var highlight in _pickHighlights)
+            highlight.QueueFree();
 
-        _insertSlotButtons.Clear();
+        _pickHighlights.Clear();
     }
 
-    private void OnInsertSlotChosen(int index)
+    private void HandleSlotGuiInput(int index, InputEvent e)
     {
-        _slotCompletion?.TrySetResult(index);
+        if (!_picking || _slotCompletion == null)
+            return;
+
+        if (e is not InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: false })
+            return;
+
+        // 允许点击任意格子（含空格子与已有火色格）。
+        // 空格子 → 内部追加到当前火色的下一格；已有火色格 → 该格及以下下移一格后插入。
+        if (index >= 0 && index < _slots.Length)
+        {
+            _picking = false;
+            ClearPickHighlights();
+            _slotCompletion.TrySetResult(index);
+        }
     }
 
     public override void _Process(double delta)
@@ -159,6 +177,7 @@ public partial class YalisalinFireColorCounter : Control
             var index = i;
             slot.Connect(SignalName.MouseEntered, Callable.From(() => OnSlotHovered(index)));
             slot.Connect(SignalName.MouseExited, Callable.From(() => OnSlotUnhovered(index)));
+            slot.GuiInput += (e) => HandleSlotGuiInput(index, e);
             AddChild(slot);
         }
     }

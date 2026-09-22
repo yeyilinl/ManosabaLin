@@ -13,7 +13,7 @@ public sealed class FullCourtVerdict() : ManosabaCardTemplate(2, CardType.Skill,
 {
     protected override IEnumerable<DynamicVar> CanonicalVars =>
     [
-        new IntVar("HpMult", 4)
+        new IntVar("HpMult", 3)
     ];
 
     protected override async Task OnPlay(PlayerChoiceContext choiceContext, CardPlay cardPlay, ComponentContext componentContext)

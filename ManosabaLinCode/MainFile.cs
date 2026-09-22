@@ -1,6 +1,7 @@
 using HarmonyLib;
 using ManosabaLin.Characters.Ananlin;
 using ManosabaLin.Characters.Ananlin.Cards;
+using ManosabaLin.Characters.Common.AncientCurses;
 using ManosabaLin.Characters.Ema.Cards;
 using ManosabaLin.Characters.Emalin;
 using ManosabaLin.Characters.Hiro;
@@ -102,13 +103,17 @@ public partial class MainFile : Node
         if (!card.CanPlay() || HasSpecialGlowColor(card))
             return null;
 
+        // 原罪诅咒卡（含魔女化诅咒卡）：发白色光
+        if (card is LinAncientCurseCard)
+            return new Color("#ffffff");
+
         return card.VisualCardPool switch
         {
             AnanlinCardPool => Ananlin.Color,
-            HiroCardPool => Hiro.Color,
+            HirolinCardPool => Hiro.Color,
             EmalinCardPool => Emalin.Color,
             SherrylinCardPool => Sherrylin.Color,
-            YalisalinCardPool => Yalisalin.Color,
+            YalisalinCardPool => new Color("#ff0000"),
             LinCardPool => OwnerCharacterColor(card) ?? new Color(0.8f, 0.8f, 0.8f),
             _ => null
         };

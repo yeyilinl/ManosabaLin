@@ -137,34 +137,79 @@ public sealed class YalisalinFireComponentContext
         return true;
     }
 
-    public string SelectionPromptText =>
-        _rightClickQueue.Count > 0
-            ? _rightClickQueue[0].Prompt
-            : Text("selectionScreenPrompt");
+    /// <summary>
+    /// 跳过当前队首的这次添火强化（不应用到任何牌），让下一个允许的添火效果顶上。
+    /// 返回是否成功（队列非空才能跳过）。
+    /// </summary>
+    public bool SkipNextRightClick()
+    {
+        if (_rightClickQueue.Count == 0)
+            return false;
+
+        _rightClickQueue.RemoveAt(0);
+        return true;
+    }
+
+    public string SelectionPromptText
+    {
+        get
+        {
+            if (_rightClickQueue.Count == 0)
+                return Text("selectionScreenPrompt");
+
+            // 未悬停：汇总显示所有待应用强化的效果，让玩家直接看到右键能做什么。
+            // 同一类型只显示一次，避免第五卡多次计数时重复刷屏。
+            var seen = new HashSet<YalisalinFireRightClickKind>();
+            return string.Join(
+                "；",
+                _rightClickQueue
+                    .Where(request => seen.Add(request.Kind))
+                    .Select(request => request.Prompt));
+        }
+    }
 
     public string SelectionPromptTextFor(CardModel? hoveredCard)
     {
-        if (hoveredCard == null || _rightClickQueue.Count == 0)
+        if (_rightClickQueue.Count == 0)
+            return Text("selectionScreenPrompt");
+
+        if (hoveredCard == null)
             return SelectionPromptText;
 
-        return _rightClickQueue[0].Kind switch
+        // 悬停某候选牌：逐条列出当前所有待应用强化对该牌的实际效果
+        var seen = new HashSet<YalisalinFireRightClickKind>();
+        return string.Join(
+            "；",
+            _rightClickQueue
+                .Where(request => seen.Add(request.Kind))
+                .Select(request => RightClickPromptFor(request.Kind, hoveredCard)));
+    }
+
+    private static string RightClickPromptFor(YalisalinFireRightClickKind kind, CardModel card)
+    {
+        switch (kind)
         {
-            YalisalinFireRightClickKind.PainKeeper => hoveredCard.Type switch
-            {
-                CardType.Attack => Text("rightClick.painKeeper.hover.attack"),
-                CardType.Skill => Text("rightClick.painKeeper.hover.skill"),
-                CardType.Power => Text("rightClick.painKeeper.hover.power"),
-                _ => Text("rightClick.generic.hover")
-            },
-            YalisalinFireRightClickKind.FifthSelfProof => hoveredCard.Type switch
-            {
-                CardType.Attack => Text("rightClick.fifthSelfProof.hover.attack"),
-                CardType.Skill => Text("rightClick.fifthSelfProof.hover.skill"),
-                CardType.Power => Text("rightClick.fifthSelfProof.hover.power"),
-                _ => Text("rightClick.generic.hover")
-            },
-            _ => SelectionPromptText
-        };
+            case YalisalinFireRightClickKind.PainKeeper:
+                return card.Type switch
+                {
+                    CardType.Attack => Text("rightClick.painKeeper.hover.attack"),
+                    CardType.Skill => Text("rightClick.painKeeper.hover.skill"),
+                    CardType.Power => Text("rightClick.painKeeper.hover.power"),
+                    _ => Text("rightClick.generic.hover")
+                };
+            case YalisalinFireRightClickKind.UnneededGoodChildCostUp:
+                return Text("rightClick.unneededGoodChild.prompt");
+            case YalisalinFireRightClickKind.FifthSelfProof:
+                return card.Type switch
+                {
+                    CardType.Attack => Text("rightClick.fifthSelfProof.hover.attack"),
+                    CardType.Skill => Text("rightClick.fifthSelfProof.hover.skill"),
+                    CardType.Power => Text("rightClick.fifthSelfProof.hover.power"),
+                    _ => Text("rightClick.generic.hover")
+                };
+            default:
+                return Text("rightClick.generic.hover");
+        }
     }
 
     public static string Text(string suffix, params (string Name, decimal Value)[] variables)

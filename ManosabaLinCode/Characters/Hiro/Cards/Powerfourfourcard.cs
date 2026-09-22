@@ -9,7 +9,7 @@ using STS2RitsuLib.Interop.AutoRegistration;
 
 namespace ManosabaLin.Characters.Hiro.Cards;
 
-[RegisterCard(typeof(HiroCardPool))]
+[RegisterCard(typeof(HirolinCardPool))]
 public sealed class Powerfourfourcard() : ManosabaCardTemplate(2, CardType.Power, CardRarity.Uncommon, TargetType.AllAllies)
 {
     protected override IEnumerable<IHoverTip> AdditionalHoverTips

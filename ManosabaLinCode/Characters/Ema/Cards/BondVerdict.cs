@@ -69,15 +69,17 @@ public sealed class BondVerdict() : ManosabaCardTemplate(3, CardType.Attack, Car
         if (bond.Estrangement > bond.Affinity)
         {
             var debuffCount = IsUpgraded ? bond.Estrangement : bond.Estrangement / 2;
-            foreach (var enemy in CombatState.Enemies.Where(e => e.IsAlive))
+            foreach (var enemy in CombatState.Enemies.Where(e => e.IsAlive).ToList())
             {
+                if (!enemy.IsAlive) continue;
+
                 await DamageCmd.Attack(DynamicVars.Damage.BaseValue)
                     .FromCard(this, cardPlay)
                     .Targeting(enemy)
                     .WithHitFx("vfx/vfx_attack_slash")
                     .Execute(choiceContext);
 
-                for (var i = 0; i < debuffCount; i++)
+                for (var i = 0; i < debuffCount && enemy.IsAlive; i++)
                     await ApplyRandomDebuff(choiceContext, enemy);
             }
         }
@@ -96,8 +98,9 @@ public sealed class BondVerdict() : ManosabaCardTemplate(3, CardType.Attack, Car
     private async Task ApplyRandomDebuff(PlayerChoiceContext choiceContext, Creature target)
     {
         var debuffType = DebuffTypes[Owner.RunState.Rng.CombatCardSelection.NextInt(DebuffTypes.Length)];
-        var powerModel = (PowerModel)ModelDb.Get(debuffType).MutableClone();
-        await PowerCmd.Apply(choiceContext, powerModel, target, 1m, Owner.Creature, this, false);
+        if (ModelDb.Get(debuffType) is not PowerModel powerModel) return;
+        var clone = (PowerModel)powerModel.MutableClone();
+        await PowerCmd.Apply(choiceContext, clone, target, 1m, Owner.Creature, this, false);
     }
 
     private async Task ApplyRandomBuff(PlayerChoiceContext choiceContext, Creature target)

@@ -6,6 +6,7 @@ namespace ManosabaLin.Characters.Common.AncientCurses;
 [RegisterCard(typeof(LinCardPool))]
 public sealed class Cocoworry : LinAncientCurseCard
 {
+    public Cocoworry() : base(0) { }
 
     protected override async Task AfterCardDrawn(
         PlayerChoiceContext choiceContext,

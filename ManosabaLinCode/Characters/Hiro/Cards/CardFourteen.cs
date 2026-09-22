@@ -12,7 +12,7 @@ using STS2RitsuLib.Interop.AutoRegistration;
 
 namespace ManosabaLin.Characters.Hiro.Cards;
 
-[RegisterCard(typeof(HiroCardPool))]
+[RegisterCard(typeof(HirolinCardPool))]
 public sealed class CardFourteen() : ManosabaCardTemplate(0, CardType.Attack, CardRarity.Rare, TargetType.AnyEnemy)
 {
     // 需要消耗的正义层数

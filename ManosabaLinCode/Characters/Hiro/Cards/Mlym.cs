@@ -19,7 +19,7 @@ using ManosabaLin.Characters.Hiro;
 
 namespace ManosabaLin.Characters.Ema.Cards;
 
-[RegisterCard(typeof(HiroCardPool))]
+[RegisterCard(typeof(HirolinCardPool))]
 public sealed class Mlym : ManosabaCardTemplate
 {
     public Mlym() : base(2, CardType.Skill, CardRarity.Uncommon, TargetType.AnyAlly) { }

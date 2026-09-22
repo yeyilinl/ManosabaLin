@@ -14,7 +14,7 @@ public class Yalisalin : ManosabaCharacterTemplate<YalisalinCardPool, YalisalinR
 {
     public const string CharacterId = "Yalisalin";
 
-    public static readonly Color Color = new("aa66cc");
+    public static readonly Color Color = new("ff0000");
 
     public override Color NameColor => Color;
     public override Color EnergyLabelOutlineColor => new(0.67f, 0.4f, 0.8f);

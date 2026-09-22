@@ -9,17 +9,16 @@ using MegaCrit.Sts2.Core.GameActions.Multiplayer;
 using MegaCrit.Sts2.Core.HoverTips;
 using STS2RitsuLib.Interop.AutoRegistration;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace ManosabaLin.Characters.Sherrylin.Cards;
 
 /// <summary>
 /// 没有脚印，犯人是…：
-/// 清空你的减力量，选择一个队友获得等于你当前嫌疑一半的嫌疑，使其获得等量的力量，
-/// 若获得3层则令队友和自己都获得一层汉娜的魔法。
+/// 清空你的减力量，选择一个目标获得等于你当前嫌疑一半的嫌疑，使其获得等量的力量，
+/// 若获得3层则令目标和自己都获得一层汉娜的魔法。
 /// </summary>
 [RegisterCard(typeof(SherrylinCardPool))]
-public sealed class NoFootprintsCulprit() : ManosabaCardTemplate(1, CardType.Attack, CardRarity.Rare, TargetType.Self)
+public sealed class NoFootprintsCulprit() : ManosabaCardTemplate(1, CardType.Attack, CardRarity.Rare, TargetType.AnyPlayer)
 {
     protected override IEnumerable<IHoverTip> AdditionalHoverTips
     {
@@ -34,8 +33,6 @@ public sealed class NoFootprintsCulprit() : ManosabaCardTemplate(1, CardType.Att
         PlayerChoiceContext choiceContext, CardPlay cardPlay, ComponentContext componentContext)
     {
         var source = this;
-        var combatState = source.CombatState;
-        if (combatState == null) return;
 
         await CreatureCmd.TriggerAnim(source.Owner.Creature, "Cast", source.Owner.Character.CastAnimDelay);
 
@@ -52,14 +49,10 @@ public sealed class NoFootprintsCulprit() : ManosabaCardTemplate(1, CardType.Att
         var suspectAmount = suspectPower?.Amount ?? 0;
         var halfSuspect = suspectAmount / 2;
 
-        // 选择一个队友
-        var teammates = combatState.GetTeammatesOf(source.Owner.Creature)
-            .Where(c => c is { IsAlive: true, IsPlayer: true })
-            .ToList();
+        // 目标完全由 TargetType.AnyPlayer 的目标选择系统控制（手动打出时玩家可点击任一存活玩家/角色；无目标时退回自己）
+        var target = cardPlay.Target ?? source.Owner.Creature;
 
-        Creature target = teammates.Count > 0 ? teammates[0] : source.Owner.Creature;
-
-        // 使队友获得嫌疑和力量
+        // 使目标获得嫌疑和力量
         if (halfSuspect > 0)
         {
             await PowerCmd.Apply<SuspectPower>(
@@ -70,7 +63,7 @@ public sealed class NoFootprintsCulprit() : ManosabaCardTemplate(1, CardType.Att
                 choiceContext, target, halfSuspect,
                 source.Owner.Creature, source, false);
 
-            // 若获得3层则令队友和自己都获得一层汉娜的魔法
+            // 若获得3层则令目标和自己都获得一层汉娜的魔法
             if (halfSuspect >= 3)
             {
                 await PowerCmd.Apply<HnmPower>(

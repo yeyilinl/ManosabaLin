@@ -1,12 +1,15 @@
 using MinionLib.Component.Core;
 using ManosabaLin.Characters.Common;
 using ManosabaLin.Characters.Common.Powers;
+using ManosabaLin.Characters.Yalisalin.Relics;
 using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.GameActions.Multiplayer;
 using MegaCrit.Sts2.Core.HoverTips;
 using MegaCrit.Sts2.Core.Localization.DynamicVars;
 using STS2RitsuLib.Interop.AutoRegistration;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace ManosabaLin.Characters.Yalisalin.Cards;
 
@@ -47,6 +50,28 @@ public sealed class YalisalinWitchPrisoner() : ManosabaCardTemplate(3, CardType.
             this,
             false
         );
+
+        // 予燎6点附带升温的火色：分6次，每次随机给予任意敌人1点浅橙火色，给予后满足升温条件则触发升温
+        if (!YalisalinFireColorSystem.TryGetHairpin(Owner, out var hairpin))
+            return;
+
+        var enemies = Owner.Creature.CombatState.Enemies
+            .Where(static e => e.IsAlive)
+            .ToArray();
+        if (enemies.Length == 0) return;
+
+        var rng = Owner.RunState.Rng.CombatTargets;
+        for (var i = 0; i < 6; i++)
+        {
+            var target = rng.NextItem(enemies);
+            var wasFull = hairpin.IsFireColorFull(target);
+            if (!hairpin.TryAddFireColor(target, 1, this))
+                continue;
+
+            // 若给予后满足升温条件（火色被补满），触发升温效果
+            if (!wasFull && hairpin.IsFireColorFull(target))
+                await YalisalinFireColorCardHelpers.ApplyHeat(choiceContext, Owner, target, this, strong: false);
+        }
     }
 
     protected override void OnUpgrade(ComponentContext componentContext)

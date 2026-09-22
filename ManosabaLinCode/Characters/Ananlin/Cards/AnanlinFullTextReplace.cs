@@ -5,21 +5,11 @@ namespace ManosabaLin.Characters.Ananlin.Cards;
 
 [RegisterCard(typeof(AnanlinCardPool))]
 public sealed class AnanlinFullTextReplace()
-    : ManosabaCardTemplate(3, CardType.Skill, CardRarity.Rare, TargetType.AnyEnemy)
+    : ManosabaCardTemplate(3, CardType.Skill, CardRarity.Rare, TargetType.Self)
 {
-    protected override IEnumerable<DynamicVar> CanonicalVars =>
-    [
-        new DamageVar(12m, ValueProp.Move),
-        new PowerVar<SilentPower>("Silence", 2m),
-        new BlockVar(3m, ValueProp.Move),
-        new IntVar("RewriteStep", 4),
-        new CardsVar("CardsPerBlankPage", 2)
-    ];
-
     protected override IEnumerable<IHoverTip> AdditionalHoverTips =>
     [
         HoverTipFactory.FromKeyword(CardKeyword.Exhaust),
-        HoverTipFactory.FromPower<SilentPower>(),
         HoverTipFactory.FromCard<BlankPage>()
     ];
 
@@ -28,8 +18,6 @@ public sealed class AnanlinFullTextReplace()
         CardPlay cardPlay,
         ComponentContext componentContext)
     {
-        if (cardPlay.Target is not { } target) return;
-
         var selected = (await CardSelectCmd.FromSimpleGrid(
             choiceContext,
             BuildNameOptions(),
@@ -42,12 +30,6 @@ public sealed class AnanlinFullTextReplace()
             .ToArray();
         if (toExhaust.Length == 0) return;
 
-        await DamageCmd.Attack(DynamicVars.Damage.BaseValue)
-            .FromCard(this, cardPlay)
-            .Targeting(target)
-            .WithHitFx("vfx/vfx_attack_blunt")
-            .Execute(choiceContext);
-
         var exhausted = 0;
         foreach (var card in toExhaust)
         {
@@ -55,18 +37,17 @@ public sealed class AnanlinFullTextReplace()
             exhausted++;
         }
 
-        await this.AddSilence(choiceContext, exhausted * DynamicVars["Silence"].IntValue);
-        await CreatureCmd.GainBlock(Owner.Creature, exhausted * DynamicVars.Block.BaseValue, ValueProp.Move, cardPlay);
-
-        var rewriteStep = DynamicVars["RewriteStep"].IntValue;
-        var rewriteCount = exhausted / rewriteStep;
-
-        for (var i = 0; i < rewriteCount; i++)
-            await AnanlinSilenceIntentManager.ForceBrainwash(choiceContext, Owner);
-
-        var pageCount = exhausted / DynamicVars["CardsPerBlankPage"].IntValue;
-        for (var i = 0; i < pageCount; i++)
+        // 每消耗1张牌，将1张【空白书页+】加入手牌
+        for (var i = 0; i < exhausted; i++)
             await this.AddBlankPageToHand(true);
+
+        // 若消耗2张，获得1张当前缄默替换意图牌（数值=当前意图池且固定）
+        for (var i = 0; i < exhausted / 2; i++)
+            await AnanlinSilenceIntentManager.AddRandomReplacementIntentCardToHand(choiceContext, Owner);
+
+        // 若消耗3张，改写一次敌人意图
+        for (var i = 0; i < exhausted / 3; i++)
+            await AnanlinSilenceIntentManager.ForceBrainwash(choiceContext, Owner);
     }
 
     protected override void OnUpgrade(ComponentContext componentContext)

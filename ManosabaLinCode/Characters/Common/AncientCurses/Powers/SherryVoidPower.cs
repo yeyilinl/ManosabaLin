@@ -10,6 +10,8 @@ public sealed class SherryVoidPower : LinCurseConditionalPower<SherryVoid>
     public override PowerType Type => PowerType.Buff;
     public override PowerStackType StackType => PowerStackType.None;
 
+    protected override bool IsVisibleInternal => false;
+
     public override decimal ModifyDamageAdditive(
         Creature? target,
         decimal amount,

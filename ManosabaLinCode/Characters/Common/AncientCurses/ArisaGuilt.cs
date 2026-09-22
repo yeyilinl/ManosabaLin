@@ -6,6 +6,7 @@ namespace ManosabaLin.Characters.Common.AncientCurses;
 [RegisterCard(typeof(LinCardPool))]
 public sealed class ArisaGuilt : LinAncientCurseCard
 {
+    public ArisaGuilt() : base(0) { }
 
     protected override IEnumerable<DynamicVar> CanonicalVars
     {

@@ -16,15 +16,7 @@ public sealed class AnanlinBackstageResentment()
         new PowerVar<SilentPower>(SilenceKey, 13m)
     ];
 
-    protected override IEnumerable<IHoverTip> AdditionalHoverTips =>
-    [
-        HoverTipFactory.FromPower<AnanlinPeaceOfMindPower>(),
-        HoverTipFactory.FromPower<SilentPower>(),
-        HoverTipFactory.FromPower<AnanlinBrainwashPower>(),
-        HoverTipFactory.FromPower<AnanlinBrainwashBacklashPower>(),
-        HoverTipFactory.FromCard<BlankPage>(),
-        HoverTipFactory.FromCard<MarginPage>()
-    ];
+   
 
     protected override async Task OnPlay(
         PlayerChoiceContext choiceContext,

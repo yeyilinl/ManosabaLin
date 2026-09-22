@@ -1,4 +1,5 @@
 using ManosabaLin.Characters.Ananlin.Powers;
+using ManosabaLin.Characters.Ananlin.Relics;
 using MegaCrit.Sts2.Core.MonsterMoves.Intents;
 
 namespace ManosabaLin.Characters.Ananlin.Cards;
@@ -6,16 +7,9 @@ namespace ManosabaLin.Characters.Ananlin.Cards;
 [RegisterCard(typeof(AnanlinCardPool))]
 public sealed class AnanlinNoahsButterflyTalisman() : ManosabaCardTemplate(1, CardType.Attack, CardRarity.Rare, TargetType.AnyEnemy)
 {
-    private const string RecordVar = "Record";
-    private const string TriggerSilenceVar = "TriggerSilence";
-    private const string FallbackSilenceVar = "FallbackSilence";
-
     protected override IEnumerable<DynamicVar> CanonicalVars =>
     [
-        new DamageVar(6m, ValueProp.Move),
-        new PowerVar<AnanlinButterflyTalismanPower>(RecordVar, 8m),
-        new PowerVar<SilentPower>(TriggerSilenceVar, 2m),
-        new PowerVar<SilentPower>(FallbackSilenceVar, 2m)
+        new DamageVar(6m, ValueProp.Move)
     ];
 
     public override IEnumerable<CardKeyword> CanonicalKeywords
@@ -25,9 +19,8 @@ public sealed class AnanlinNoahsButterflyTalisman() : ManosabaCardTemplate(1, Ca
 
     protected override IEnumerable<IHoverTip> AdditionalHoverTips =>
     [
-        HoverTipFactory.FromPower<AnanlinButterflyTalismanPower>(),
-        HoverTipFactory.FromPower<SilentPower>(),
-        HoverTipFactory.FromPower<CrimsonbutterflyPower>()
+        HoverTipFactory.FromPower<CrimsonbutterflyPower>(),
+        HoverTipFactory.FromPower<SilentPower>()
     ];
 
     protected override async Task OnPlay(PlayerChoiceContext choiceContext, CardPlay cardPlay, ComponentContext componentContext)
@@ -43,30 +36,14 @@ public sealed class AnanlinNoahsButterflyTalisman() : ManosabaCardTemplate(1, Ca
 
         if (anyAttackIntent)
         {
-            var talisman = await PowerCmd.Apply<AnanlinButterflyTalismanPower>(
-                choiceContext,
-                Owner.Creature,
-                DynamicVars[RecordVar].BaseValue,
-                Owner.Creature,
-                this);
-            if (talisman != null)
-            {
-                talisman.RecordDamage(DynamicVars[RecordVar].BaseValue);
-            }
-
-            await this.AddSilence(choiceContext, DynamicVars[TriggerSilenceVar].IntValue);
+            // 给予所有人【蝴蝶】，并随机立刻生效1种替换意图效果
+            await PowerCmd.Apply<CrimsonbutterflyPower>(choiceContext, Owner.Creature, 1m, Owner.Creature, this);
+            await AnanlinSilenceIntentManager.TriggerRandomReplacementEffect(choiceContext, Owner);
             return;
         }
 
-        if (this.Sketchbook() is { } sketchbook)
-            await sketchbook.AddSilence(choiceContext, DynamicVars[FallbackSilenceVar].IntValue, this);
-        else
-            await PowerCmd.Apply<SilentPower>(
-                choiceContext,
-                Owner.Creature,
-                DynamicVars[FallbackSilenceVar].BaseValue,
-                Owner.Creature,
-                this);
+        // 若没有一个攻击意图，缄默替换意图数值+1，下回合将本牌返回手牌
+        AnanlinSilenceIntentManager.IncreaseSilenceGrowth(Owner);
 
         var returnPower = await PowerCmd.Apply<AnanlinDelayedCardReturnPower>(
             choiceContext,
@@ -79,7 +56,7 @@ public sealed class AnanlinNoahsButterflyTalisman() : ManosabaCardTemplate(1, Ca
 
     protected override void OnUpgrade(ComponentContext componentContext)
     {
-        DynamicVars[RecordVar].UpgradeValueBy(4m);
+        DynamicVars.Damage.UpgradeValueBy(4m);
     }
 
     private bool HasAttackIntent(Creature target)

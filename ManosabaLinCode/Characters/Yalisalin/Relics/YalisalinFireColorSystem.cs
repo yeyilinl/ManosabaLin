@@ -14,16 +14,18 @@ public static class YalisalinFireColorSystem
                && hairpin.TryAddFireColor(target, amount, source);
     }
 
-    public static bool TryConvertFireColor(Player player, Creature target, CardModel? source = null)
+    public static bool TryConvertFireColor(Player player, Creature target, out YalisalinFireColor promoteColor, CardModel? source = null)
     {
+        promoteColor = default;
         return TryGetHairpin(player, out var hairpin)
-               && hairpin.TryConvertFireColor(target, source);
+               && hairpin.TryConvertFireColor(target, out promoteColor, source);
     }
 
-    public static bool TryStrongConvertFireColor(Player player, Creature target, CardModel? source = null)
+    public static bool TryStrongConvertFireColor(Player player, Creature target, out YalisalinFireColor promoteColor, CardModel? source = null)
     {
+        promoteColor = default;
         return TryGetHairpin(player, out var hairpin)
-               && hairpin.TryStrongConvertFireColor(target, source);
+               && hairpin.TryStrongConvertFireColor(target, out promoteColor, source);
     }
 
     public static bool TryDowngradeFireColor(

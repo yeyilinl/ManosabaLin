@@ -12,7 +12,7 @@ using System.Linq;
 
 namespace ManosabaLin.Characters.Hiro.Cards;
 
-[RegisterCard(typeof(HiroCardPool))]
+[RegisterCard(typeof(HirolinCardPool))]
 public sealed class Three : ManosabaCardTemplate
 {
     private const int EnergyCost = 1;

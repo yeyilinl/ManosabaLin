@@ -49,6 +49,10 @@ public sealed class AnnAffinity : ManosabaCardTemplate
         var prefs = new CardSelectorPrefs(SelectionScreenPrompt, pickCount, Math.Min(pickCount, drawCards.Count));
         var selected = await CardSelectCmd.FromSimpleGrid(choiceContext, drawCards, owner, prefs);
 
+        // 等待选择界面完全关闭后再继续：原版选择屏幕是延迟释放（QueueFreeSafely），
+        // 选完立即继续会让残留的牌框短暂留在屏幕上（过一会才消除）
+        await Cmd.Wait(0.15f);
+
         foreach (var card in selected)
         {
             if (bond != null && bond.Affinity > bond.Estrangement)
