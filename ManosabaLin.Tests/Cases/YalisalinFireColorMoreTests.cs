@@ -3,6 +3,7 @@ using ManosabaLin.Characters.Hiro.Powers;
 using ManosabaLin.Characters.Yalisalin;
 using ManosabaLin.Characters.Yalisalin.Cards;
 using ManosabaLin.Characters.Yalisalin.Powers;
+using ManosabaLin.Characters.Yalisalin.Relics;
 using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.Entities.Powers;
 using MegaCrit.Sts2.Core.Models.Monsters;
@@ -41,11 +42,13 @@ public sealed class YalisalinFireColorMoreTests : CombatTestSuite
     [Fact]
     public async Task Ashinpages_gives_seven_block()
     {
-        var enemy = EnemyAt(0);
         var card = await AddToHand<Ashinpages>();
         await PlayerCmd.SetEnergy(10, Player);
         await WaitForIdle();
-        await Play(card, enemy);
+
+        // 这张牌是 TargetType.AllEnemies：IsValidTarget(非 null 目标) 对它一律返回 false，
+        // 传具体敌人会被 harness 判成「打出失败」并把整轮 runner 打断，所以这里必须不带目标。
+        await Play(card);
         Assert.Equal(7, Player.Creature.Block);
     }
 
@@ -171,38 +174,48 @@ public sealed class YalisalinFireColorMoreTests : CombatTestSuite
     /// （每色独立能力）——封存暗橘火色后，能力栏出现对应的
     /// <see cref="YalisalinSealedLightOrangeFirePower"/>，且不会出现其他 3 色的能力。
     /// </summary>
+    /// <summary>
+    ///     （夹在书页里的灰）——按「当前封存火焰」的最高一档，给全体敌人施加对应层数的易伤：
+    ///     浅橙 1 层 / 亮黄 2 层 / 赤红 3 层 / 黑红碳化 4 层；没有封存火焰时只给格挡。
+    /// </summary>
+    /// <remarks>
+    ///     这张牌**只读取**封存火焰、自己并不封存（封存由发夹内部完成），所以测试直接把封存
+    ///     塞进发夹，再验证卡牌的读取+施加链路。旧版断言认为打这张牌会「封存目标最早火色」，
+    ///     那是被替换掉的设计（zhs 文案与卡片实现现在都是「读取封存→易伤」），故一并更新。
+    /// </remarks>
     [Fact]
     public async Task Sealed_fire_power_is_per_color()
     {
         var enemy = EnemyAt(0);
 
-        // 先给敌人加 2 段火色（默认暗橘 LightOrange）
-        var unseen = await AddToHand<Unseenkindling>();
-        await PlayerCmd.SetEnergy(10, Player);
-        await WaitForIdle();
-        await Play(unseen, enemy);
+        Assert.True(YalisalinFireColorSystem.TryGetHairpin(Player, out var hairpin));
+        Assert.NotNull(hairpin);
 
-        // 灰烬书页：敌人有火色 → 封存最早火色（暗橘）并 Sync
+        // ① 没有任何封存火焰 → 只给 7 点格挡，不给易伤
         var ash = await AddToHand<Ashinpages>();
         await PlayerCmd.SetEnergy(10, Player);
         await WaitForIdle();
-        await Play(ash, enemy);
+        await Play(ash);
+        Assert.Equal(7, Player.Creature.Block);
+        Assert.Equal(0, CardTestAssertions.PowerAmount<VulnerablePower>(enemy));
 
-        // 只应出现暗橘封存能力
-        Assert.NotNull(Player.Creature.GetPower<YalisalinSealedLightOrangeFirePower>());
-        Assert.Null(Player.Creature.GetPower<YalisalinSealedBrightYellowFirePower>());
-        Assert.Null(Player.Creature.GetPower<YalisalinSealedRedFirePower>());
-        Assert.Null(Player.Creature.GetPower<YalisalinSealedBlackRedFirePower>());
-
-        // 再打一次灰烬书页：已有封存 → 复制封存（暗橘+1），暗橘能力仍在且不出现其他色
+        // ② 封存 1 层浅橙（最低档）→ 最高档 = 浅橙 = 1 层易伤
+        hairpin!.GrantSealedFire(YalisalinFireColor.LightOrange);
         var ash2 = await AddToHand<Ashinpages>();
         await PlayerCmd.SetEnergy(10, Player);
         await WaitForIdle();
-        await Play(ash2, enemy);
+        await Play(ash2);
+        Assert.Equal(1, CardTestAssertions.PowerAmount<VulnerablePower>(enemy));
 
-        Assert.NotNull(Player.Creature.GetPower<YalisalinSealedLightOrangeFirePower>());
-        Assert.Null(Player.Creature.GetPower<YalisalinSealedBrightYellowFirePower>());
-        Assert.Null(Player.Creature.GetPower<YalisalinSealedRedFirePower>());
-        Assert.Null(Player.Creature.GetPower<YalisalinSealedBlackRedFirePower>());
+        // ③ 再封存 1 层黑红碳化（最高档）→ 最高档变黑红 = 4 层，叠加在已有的 1 层之上
+        hairpin.GrantSealedFire(YalisalinFireColor.BlackRed);
+        var ash3 = await AddToHand<Ashinpages>();
+        await PlayerCmd.SetEnergy(10, Player);
+        await WaitForIdle();
+        await Play(ash3);
+        Assert.Equal(5, CardTestAssertions.PowerAmount<VulnerablePower>(enemy));
+
+        // 最高档仍是黑红：不会因为浅橙层数多而回落
+        Assert.Equal(4, hairpin.GetHighestSealedFireStacks());
     }
 }

@@ -7,6 +7,8 @@ using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.GameActions.Multiplayer;
 using MegaCrit.Sts2.Core.HoverTips;
+using MegaCrit.Sts2.Core.Localization.DynamicVars;
+using MegaCrit.Sts2.Core.Models;
 using STS2RitsuLib.Interop.AutoRegistration;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,10 +16,17 @@ using MegaCrit.Sts2.Core.Entities.Players;
 
 namespace ManosabaLin.Characters.Ema.Cards;
 
+/// <summary>
+/// 替身的温柔 - 2费技能：亲近+1，获得 Cards 张「友方目标牌池」的零费牌
+/// （零费 = 从对方卡池里随机抽一张**不看费用**的牌，抽到后把它的费用设成 0，而不是只挑本来就是 0 费的牌）；
+/// 亲近 &gt; 疏远 时，被选的队友自己再获得 1 张。升级后自己那份 1 → 2 张。
+/// </summary>
 [RegisterCard(typeof(EmalinCardPool))]
 public sealed class SwapBodySuccess : ManosabaCardTemplate
 {
     public SwapBodySuccess() : base(2, CardType.Skill, CardRarity.Rare, TargetType.AnyPlayer) { }
+
+    protected override IEnumerable<DynamicVar> CanonicalVars => [new CardsVar(1)];
 
     protected override IEnumerable<IHoverTip> AdditionalHoverTips
     {
@@ -36,42 +45,46 @@ public sealed class SwapBodySuccess : ManosabaCardTemplate
         // 选择目标玩家
         var targetPlayer = (cardPlay.Target ?? creature).Player ?? owner;
 
-        // 获得一张目标角色卡池零费随机卡
-        var targetPool = targetPlayer.Character.CardPool;
-        var poolCards = targetPool.AllCards
+        // 从目标角色卡池里抽随机牌（不筛费用），再把它设成免费
+        var ownCount = (int)DynamicVars.Cards.BaseValue;
+        for (var i = 0; i < ownCount; i++)
+        {
+            var card = CreateFreeRandomCardFromPool(owner, targetPlayer, owner, combatState);
+            if (card != null)
+                await CardPileCmd.AddGeneratedCardToCombat(card, PileType.Hand, owner);
+        }
+
+        // 亲近大于疏远时，选择的队友再获得一张（这份不随升级翻倍）
+        if (bond != null && bond.Affinity > bond.Estrangement && targetPlayer != owner)
+        {
+            var bonusCard = CreateFreeRandomCardFromPool(owner, targetPlayer, targetPlayer, combatState);
+            if (bonusCard != null)
+                await CardPileCmd.AddGeneratedCardToCombat(bonusCard, PileType.Hand, targetPlayer);
+        }
+    }
+
+    /// <summary>
+    /// 从 <paramref name="poolOwner"/> 的角色卡池里随机造一张牌（排除基础牌），
+    /// 并把它设成「本回合或直到打出为止」免费。费用原本几费都行。
+    /// </summary>
+    private static CardModel? CreateFreeRandomCardFromPool(
+        Player rngOwner, Player poolOwner, Player cardOwner, ICombatState combatState)
+    {
+        var poolCards = poolOwner.Character.CardPool.AllCards
             .Where(c => c.Rarity != CardRarity.Basic)
             .ToList();
 
-        if (poolCards.Count > 0)
-        {
-            var rng = owner.RunState.Rng.CombatCardSelection;
-            var template = rng.NextItem(poolCards);
-            var card = combatState.CreateCard(template, owner);
-            card.SetToFreeThisTurn();
-            await CardPileCmd.AddGeneratedCardToCombat(card, PileType.Hand, owner);
-        }
+        if (poolCards.Count == 0) return null;
 
-        // 亲近大于疏远时，选择的队友再获得一张
-        if (bond != null && bond.Affinity > bond.Estrangement && targetPlayer != owner)
-        {
-            var allyPool = targetPlayer.Character.CardPool;
-            var allyPoolCards = allyPool.AllCards
-                .Where(c => c.Rarity != CardRarity.Basic)
-                .ToList();
-
-            if (allyPoolCards.Count > 0)
-            {
-                var rng = owner.RunState.Rng.CombatCardSelection;
-                var template = rng.NextItem(allyPoolCards);
-                var bonusCard = combatState.CreateCard(template, targetPlayer);
-                bonusCard.SetToFreeThisTurn();
-                await CardPileCmd.AddGeneratedCardToCombat(bonusCard, PileType.Hand, targetPlayer);
-            }
-        }
+        var rng = rngOwner.RunState.Rng.CombatCardSelection;
+        var template = rng.NextItem(poolCards);
+        var card = combatState.CreateCard(template, cardOwner);
+        card.SetToFreeThisTurn();
+        return card;
     }
 
     protected override void OnUpgrade(ComponentContext componentContext)
     {
-        EnergyCost.UpgradeBy(-1);
+        DynamicVars.Cards.UpgradeValueBy(1);
     }
 }

@@ -43,6 +43,9 @@ public abstract class ManosabaCardTemplate(
             var beta = $"beta/{fileName}".CardsImagePath();
             var betaPortrait = ResourceLoader.Exists(beta) ? beta : null;
 
+            // 卡框不走 CardAssetProfile.FramePath：整幅自定义卡框图塞 %Frame（固定 300x422 + KeepAspectCentered）
+            // 会被按比例装小成 300x386、留出上下空隙且丢掉原版卡框；改用「原版卡框 + 自定义卡框装饰节点」，
+            // 由 CharacterCardFramePatch（NCard.Reload postfix）处理。
             return new CardAssetProfile(portrait, betaPortrait);
         }
     }

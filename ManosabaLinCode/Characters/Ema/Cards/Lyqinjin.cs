@@ -20,7 +20,7 @@ namespace ManosabaLin.Characters.Ema.Cards;
 [RegisterCard(typeof(EmalinCardPool))]
 public sealed class Lyqinjin : ManosabaCardTemplate
 {
-    public Lyqinjin() : base(1, CardType.Attack, CardRarity.Common, TargetType.AnyPlayer) { }
+    public Lyqinjin() : base(2, CardType.Attack, CardRarity.Common, TargetType.AnyPlayer) { }
 
     protected override IEnumerable<IHoverTip> AdditionalHoverTips
     {
@@ -53,7 +53,8 @@ public sealed class Lyqinjin : ManosabaCardTemplate
         // 亲近 > 疏远时，目标额外减少的嫌疑为2层
         var selfReduce = 1;
         var allyReduce = 1;
-        if (bond != null && bond.Affinity > bond.Estrangement)
+        // 花朵绽放：被监听的队友打出的【亲近】牌必定触发额外效果（友方多减 1 层嫌疑）
+        if (bond != null && (bond.Affinity > bond.Estrangement || FlowerBloomTracker.IsWatched(creature)))
             allyReduce = 2;
 
         // 减少嫌疑

@@ -39,6 +39,15 @@ public sealed class EmotionPower : ManosabaActionTemplate
         if (cardPlay.Card.Owner?.Creature != Owner) return;
         if (cardPlay.Card.Type == CardType.Power && cardPlay.Card.Rarity == CardRarity.Token) return;
 
+        await GainEmotion(choiceContext);
+    }
+
+    /// <summary>
+    ///     外部来源（例如「传递的情绪」的队友出牌）为雪莉增加 1 层【情绪】。
+    ///     与自身出牌共用同一套「满 13 层 → 随机基础情绪卡进【他人的情绪】」结算。
+    /// </summary>
+    public async Task GainEmotion(PlayerChoiceContext choiceContext)
+    {
         Amount++;
         Flash();
 

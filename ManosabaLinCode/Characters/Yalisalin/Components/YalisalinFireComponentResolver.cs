@@ -125,7 +125,6 @@ public static class YalisalinFireComponentResolver
 
             context.ChosenCard = await ChooseCard(choiceContext, context);
             context.ChosenCard ??= source;
-            ForcePlayableChoiceIfNeeded(context);
             context.ChoiceCompleted = true;
 
             foreach (var modifier in modifiers)
@@ -202,12 +201,28 @@ public static class YalisalinFireComponentResolver
 
         using var scope = YalisalinFireComponentSelectionRegistry.Begin(context);
 
+        // 本次语境下打不出的候选牌：界面上显示成「临时无法打出」（能量处 ×），
+        // 玩家选中它就按打不出结算 —— 不再静默替换成另一张。
+        using var unplayableScope = YalisalinFireComponentUnplayableRegistry.Begin(
+            context.ChoiceOptions.Where(card =>
+                !CanPlayFromFireComponent(context, card, ResolveTarget(card, context.Target))));
+
         // 新选择器：与「是/否」选卡界面同一套 UI（NChooseACardSelectionScreen），
         // 大卡展示选项「原牌/连接牌」本身，而非 token 卡。
-        return await CardSelectCmd.FromChooseACardScreen(
+        //
+        // 注意不能直接用 CardSelectCmd.FromChooseACardScreen：它只回传「卡片索引」这一个 int，
+        // 承载不了余火界面上的右键「添火」记录 —— 联机时右键若只改本机会让两端状态分歧。
+        // 这里改用余火专用命令，把「选中牌索引 + 全部右键记录」打包成同一份玩家选择一起同步。
+        var choice = await YalisalinFireComponentChoiceCommand.Choose(
             choiceContext,
             context.ChoiceOptions,
-            context.Owner);
+            context.Owner,
+            context);
+
+        // 两端用同一份索引回放，AppliedRightClicks 与各类费用偏移因此逐字节一致。
+        context.ApplyRightClickRecords(choice.RightClickRecords);
+
+        return choice.Card;
     }
 
     private static IEnumerable<CardModel> DetermineBurnQueue(YalisalinFireComponentContext context)
@@ -297,42 +312,6 @@ public static class YalisalinFireComponentResolver
             return;
 
         await PlayCardWithSuppressedFireComponent(choiceContext, context, card);
-    }
-
-    private static void ForcePlayableChoiceIfNeeded(YalisalinFireComponentContext context)
-    {
-        if (context.ChosenCard is not { } chosen)
-            return;
-
-        if (CanResolveChosenCard(context, chosen, includePendingChoiceEffects: true))
-            return;
-
-        var fallback = context.ChoiceOptions.FirstOrDefault(card =>
-            card != chosen && CanResolveChosenCard(context, card, includePendingChoiceEffects: true));
-        if (fallback != null)
-            context.ChosenCard = fallback;
-    }
-
-    private static bool CanResolveChosenCard(
-        YalisalinFireComponentContext context,
-        CardModel card,
-        bool includePendingChoiceEffects = false)
-    {
-        if (card == context.SourceCard)
-        {
-            if (context.SourceAlreadyPlaying || !context.ShouldAutoPlaySourceChoice)
-                return true;
-        }
-        else if (!context.ShouldAutoPlayLinkedChoice)
-        {
-            return true;
-        }
-
-        return CanPlayFromFireComponent(
-            context,
-            card,
-            ResolveTarget(card, context.Target),
-            includePendingChoiceEffects);
     }
 
     private static bool CanPlayFromFireComponent(

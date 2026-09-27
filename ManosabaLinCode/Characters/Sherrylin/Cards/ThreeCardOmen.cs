@@ -9,7 +9,7 @@ using STS2RitsuLib.Interop.AutoRegistration;
 namespace ManosabaLin.Characters.Sherrylin.Cards;
 
 [RegisterCard(typeof(SherrylinCardPool))]
-public sealed class ThreeCardOmen() : ManosabaCardTemplate(2, CardType.Power, CardRarity.Rare, TargetType.AnyAlly)
+public sealed class ThreeCardOmen() : ManosabaCardTemplate(2, CardType.Power, CardRarity.Uncommon, TargetType.AnyAlly)
 {
     public override CardMultiplayerConstraint MultiplayerConstraint => CardMultiplayerConstraint.MultiplayerOnly;
     

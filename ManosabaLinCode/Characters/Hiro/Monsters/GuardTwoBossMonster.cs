@@ -25,7 +25,8 @@ public sealed class GuardTwoBossMonster : ModMonsterTemplate
     private int FailDamage => AscensionHelper.GetValueIfAscension(AscensionLevel.DeadlyEnemies, 10, 8);
     private int WithAmount => AscensionHelper.GetValueIfAscension(AscensionLevel.DeadlyEnemies, 60, 50);
     private int WithAmount4 => AscensionHelper.GetValueIfAscension(AscensionLevel.DeadlyEnemies, 20, 10);
-    private int ShieldAmount => AscensionHelper.GetValueIfAscension(AscensionLevel.DeadlyEnemies, 50, 40);
+    /// <summary>该 BOSS 每次攻击自带的护盾量；诈尸护盾也以它为下限，避免诈尸时无盾可破。</summary>
+    public int ShieldAmount => AscensionHelper.GetValueIfAscension(AscensionLevel.DeadlyEnemies, 50, 40);
 
     public override MonsterAssetProfile AssetProfile => new(
         VisualsScenePath: "res://ManosabaLin/scenes/monsters/guard_two_boss.tscn"
@@ -199,6 +200,14 @@ public sealed class GuardTwoBossMonster : ModMonsterTemplate
         if (creature != Creature) return;
 
         PlayLastStandMusic();
+
+        // 「死亡被阻止」这一趟就是诈尸，绝不能在这里发奖励：
+        // RewardsCmd.OfferCustom 会发起一次玩家选择（RewardsSet.Offer → CardReward.OnSelect），
+        // 而它此刻正嵌在伤害管线里，会把同一次伤害中紧随其后的
+        // Hook.AfterPreventingDeath（SetMaxAndCurrentHp 无限血 + GainBlock 护盾）整段打断 ——
+        // 实测表现为「诈尸音效响起，但没复活、没护盾、原地停在 0 血」。
+        // 战胜奖励留到 wasRemovalPrevented == false 的那次真死再发。
+        if (wasRemovalPrevented) return;
 
         var linCardPool = ModelDb.CardPool<LinCardPool>();
         if (linCardPool == null) return;

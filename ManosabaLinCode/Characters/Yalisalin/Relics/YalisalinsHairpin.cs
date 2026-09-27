@@ -23,6 +23,7 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
     private readonly Dictionary<CardModel, bool> _dontLookAtMeCards = [];
     private readonly List<(CardModel Card, int Block)> _glassReturnCards = [];
     private readonly Dictionary<CardModel, BringHomePendingCard> _bringHomeCards = [];
+    private readonly List<CardModel> _burnedCardsThisTurn = [];
     private Creature? _currentFireColorTarget;
     private long _conversionSequence;
 
@@ -180,6 +181,31 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
                || SealedBlackRed > 0;
     }
 
+    /// <summary>
+    ///     当前四档封存火色的总数量。
+    ///     供「被缚的普罗米修斯」在结算瞬间读取（这是那张卡的核心张力）。
+    /// </summary>
+    public int TotalSealedFireCount =>
+        SealedLightOrange + SealedBrightYellow + SealedRed + SealedBlackRed;
+
+    /// <summary>
+    ///     当前封存火焰能力里最高一档对应的层数：
+    ///     浅橙 1 / 亮黄 2 / 赤红 3 / 黑红碳化 4；没有任何封存火焰时返回 0。
+    ///     供「夹在书页里的灰」按颜色给全体敌人施加易伤使用。
+    /// </summary>
+    public int GetHighestSealedFireStacks()
+    {
+        if (SealedBlackRed > 0)
+            return 4;
+        if (SealedRed > 0)
+            return 3;
+        if (SealedBrightYellow > 0)
+            return 2;
+        if (SealedLightOrange > 0)
+            return 1;
+        return 0;
+    }
+
     public bool TryCopySealedFire()
     {
         if (!TryGetSealedFireColorToCopy(out var color))
@@ -188,6 +214,15 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
         GrantSealedFire(color);
         return true;
     }
+
+    /// <summary>
+    ///     本回合被余火烧掉、且仍然可以返回手牌的牌（按烧掉顺序，已去重）。
+    ///     供「第二次点燃」随机取回使用。
+    /// </summary>
+    public CardModel[] BurnedCardsThisTurn =>
+        _burnedCardsThisTurn
+            .Where(static card => !card.HasBeenRemovedFromState)
+            .ToArray();
 
     public bool TrySealEarliestFireColor(Creature target, out YalisalinFireColor color)
     {
@@ -364,6 +399,7 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
         _dontLookAtMeCards.Clear();
         _glassReturnCards.Clear();
         _bringHomeCards.Clear();
+        _burnedCardsThisTurn.Clear();
         _currentFireColorTarget = null;
         _conversionSequence = 0;
         SinForgiveThisCombat = 0;
@@ -413,6 +449,7 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
         _dontLookAtMeCards.Clear();
         _glassReturnCards.Clear();
         _bringHomeCards.Clear();
+        _burnedCardsThisTurn.Clear();
         _currentFireColorTarget = null;
         _conversionSequence = 0;
         PainKeeperPerTurnLimit = 0;
@@ -504,6 +541,7 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
 
         PainKeeperUsedThisTurn = 0;
         FireComponentBurnsThisTurn = 0;
+        _burnedCardsThisTurn.Clear();
         YellowNextTurnEnergyGrantedThisTurn = 0;
         PendingYellowCostReduction = 0;
         PreserveHighestRewriteEnergyUsedThisTurn = false;
@@ -709,6 +747,13 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
 
         if (context.BurnedCard is { } burned)
         {
+            _burnedCardsThisTurn.Remove(burned);
+            _burnedCardsThisTurn.Add(burned);
+
+            // 痛觉的重量（独立能力 Power）：累计余火烧牌数，达到阈值获得力量
+            if (Owner.Creature.GetPower<WeightOfPainPower>() is { } weightOfPain)
+                await weightOfPain.ResolveBurned(choiceContext);
+
             // 你的包容很刺眼（独立能力 Power）：余火烧掉牌时造成伤害+格挡
             if (Owner.Creature.GetPower<DazzlingTolerancePower>() is { } tolerance)
                 await tolerance.ResolveBurned(choiceContext, burned, context.SourceCard, context.CardPlay);
@@ -741,8 +786,12 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
 
         switch (card.Type)
         {
-            case CardType.Attack when context.Target is { } target && target.Side != Owner.Creature.Side:
-                await PowerCmd.Apply<YlsmPower>(choiceContext, target, 1, Owner.Creature, context.SourceCard, false);
+            // 攻击牌：给予全部存活敌人各 1 层亚里沙的魔法（不再是只给当前目标）。
+            case CardType.Attack:
+                if (Owner.Creature.CombatState is { } combatState)
+                    foreach (var enemy in combatState.Enemies.Where(e => e.IsAlive).ToList())
+                        await PowerCmd.Apply<YlsmPower>(
+                            choiceContext, enemy, 1, Owner.Creature, context.SourceCard, false);
                 break;
             case CardType.Skill:
                 await PlayerCmd.GainEnergy(1, Owner);
@@ -881,6 +930,14 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
         {
             await ResolveFireColorConsumedRewards(choiceContext, result.Consumed, source);
             Flash();
+
+            // 「被缚的普罗米修斯」：本次消耗照常全额结算（上面的余火/原罪钩子都已触发），
+            // 额外再把其中 1 格封存给自己 —— 是额外收益，不是替换。
+            if (Owner.Creature.GetPower<BoundPrometheusPower>() is { Amount: > 0 })
+            {
+                GrantSealedFire(result.Consumed[0].Color);
+                Flash();
+            }
         }
 
         return result;
@@ -946,7 +1003,9 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
         if (options.Count == 0)
             return false;
 
-        var selected = options[Random.Shared.Next(options.Count)];
+        // 联机下必须用同步 RNG：Random.Shared 是进程本地随机，房主/客机会各选一张不同的牌，
+        // 导致「回合开始」检查点状态分歧（RitsuLib StateDivergence → 踢客机）。
+        var selected = Owner.RunState.Rng.CombatCardSelection.NextItem(options);
         await CardPileCmd.Add(selected, PileType.Hand);
         return true;
     }

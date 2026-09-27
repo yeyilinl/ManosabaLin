@@ -6,6 +6,7 @@ using MegaCrit.Sts2.Core.GameActions.Multiplayer;
 using MegaCrit.Sts2.Core.Helpers;
 using MegaCrit.Sts2.Core.Models;
 using STS2RitsuLib.Interop.AutoRegistration;
+using System;
 
 namespace ManosabaLin.Characters.Hiro.Powers;
 
@@ -77,5 +78,40 @@ public class PerjuryPower : ManosabaPowerTemplate
     public override async Task AfterApplied(Creature? applier, CardModel? cardSource)
     {
         await CheckAndConvert();
+    }
+
+    /// <summary>
+    ///     「我才是正确」用：按需要的层数消耗伪证；伪证不足时把 1 层【正义】兑换成 5 层伪证一起消耗，
+    ///     兑换产生的多余层数保留为伪证。
+    ///     <para>全程用 <c>SetAmount(silent: true)</c> 写入，避免触发本类「满 5 层自动转正义」的结算。</para>
+    /// </summary>
+    /// <returns>实际消耗掉的伪证层数。</returns>
+    public async Task<int> ConsumeForGuard(int amount)
+    {
+        if (amount <= 0 || Owner is null) return 0;
+
+        var consumed = 0;
+
+        for (var guard = 0; consumed < amount && guard < 64; guard++)
+        {
+            if (Amount > 0)
+            {
+                var take = Math.Min(amount - consumed, Amount);
+                SetAmount(Amount - take, true);
+                consumed += take;
+                continue;
+            }
+
+            var justice = Owner.GetPower<JusticePower>();
+            if (justice is null || justice.Amount <= 0) break;
+
+            await PowerCmd.ModifyAmount(new ThrowingPlayerChoiceContext(), justice, -1, Owner, null);
+            SetAmount(Amount + 5, true);
+        }
+
+        if (consumed > 0) Flash();
+        if (Amount <= 0) RemoveInternal();
+
+        return consumed;
     }
 }

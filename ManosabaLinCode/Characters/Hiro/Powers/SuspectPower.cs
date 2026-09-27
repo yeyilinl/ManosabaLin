@@ -2,6 +2,7 @@
 using ManosabaLin.Characters.Hiro.Cards;
 using ManosabaLin.Characters.Ananlin.Cards;
 using ManosabaLin.Characters.Sherrylin.Cards;
+using ManosabaLin.Characters.Yalisalin.Powers;
 
 namespace ManosabaLin.Characters.Hiro.Powers;
 
@@ -47,7 +48,8 @@ public sealed class SuspectPower : ManosabaPowerTemplate
             var newThreshold = (int)(currentAmount / 2);
             var strengthLoss = (newThreshold - oldThreshold) * StrengthLossPerTwoStacks;
 
-            if (strengthLoss > 0)
+            // 【龙之魔女】：持有者本回合免疫「嫌疑」造成的减力量。
+            if (strengthLoss > 0 && Owner.GetPower<DragonWitchPower>() == null)
                 await PowerCmd.Apply<StrengthPower>(
                     choiceContext,
                     Owner,

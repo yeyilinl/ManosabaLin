@@ -84,10 +84,12 @@ public sealed class JusticeEnforcer() : ManosabaCardTemplate(3, CardType.Power, 
 
             if (enemies.Count > 0)
             {
-                var rng = new System.Random();
+                // 联机下必须用同步 RNG：原为 new System.Random()（进程本地随机），
+                // 伪证层数各段伤害会打到不同敌人，造成结算分歧（RitsuLib StateDivergence → 踢客机）。
+                var rng = owner.RunState.Rng.CombatTargets;
                 for (var i = 0; i < perjuryAmt; i++)
                 {
-                    await CreatureCmd.Damage(choiceContext, enemies[rng.Next(enemies.Count)], 2 + (int)(withAmt / 50), ValueProp.Unpowered, null, null);
+                    await CreatureCmd.Damage(choiceContext, rng.NextItem(enemies) ?? enemies[0], 2 + (int)(withAmt / 50), ValueProp.Unpowered, null, null);
                 }
             }
             await PowerCmd.Apply<JusticePower>(choiceContext, owner.Creature, perjuryAmt, owner.Creature, source, false);

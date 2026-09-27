@@ -29,9 +29,13 @@ internal static class YalisalinFireComponentSelectionRegistry
             return false;
 
         // 余火选择界面：右键一律接管为「添火强化」，不再打开卡牌详情预览。
-        // 有可用强化则应用并刷新提示；无可用强化（次数已用完）则仅刷新提示，告知玩家。
-        if (context.PendingRightClicks.Count > 0)
-            context.TryApplyNextRightClick(card);
+        // 有可用强化则登记「作用在这张牌上」；无可用强化（次数已用完）则仅闪一下提示，告知玩家。
+        //
+        // ⚠️ 这里只登记、不生效。真实效果由 YalisalinFireComponentChoiceCommand 随玩家选择一起
+        // 同步给对手，两端用同一份索引在 ApplyRightClickRecords 里回放。
+        // 旧实现在这里直接改本机 context，联机时只有点右键的那台机器生效 → checksum 状态分歧。
+        if (context.RemainingRightClickCount > 0)
+            context.RecordRightClickApplication(card);
         else
             Flash(screen);
 
@@ -96,7 +100,6 @@ internal static class YalisalinFireComponentSelectionRegistry
     /// </summary>
     internal static void UpdateChooseScreen(NChooseACardSelectionScreen screen)
     {
-        GD.Print($"[余火][诊断] UpdateChooseScreen 触发, Current={(Current != null)}, queue={(Current?.PendingRightClicks.Count ?? -1)}");
         var context = Current;
         if (context != null)
             UpdatePrompt(screen, context, null);
@@ -110,7 +113,7 @@ internal static class YalisalinFireComponentSelectionRegistry
     private static void EnsureSkipButton(NChooseACardSelectionScreen screen, YalisalinFireComponentContext? context)
     {
         var skip = screen.GetNodeOrNull<Godot.Button>(SkipButtonName);
-        var skipEnabled = context != null && context.PendingRightClicks.Count > 0;
+        var skipEnabled = context != null && context.RemainingRightClickCount > 0;
 
         if (!skipEnabled)
         {
@@ -124,7 +127,6 @@ internal static class YalisalinFireComponentSelectionRegistry
             skip = CreateSkipButton(screen);
             screen.AddChild(skip);
             PositionSkipButtonBottomRight(screen, skip);
-            GD.Print($"[余火][诊断] 已创建跳过按钮 size={screen.Size}");
         }
 
         skip.Visible = true;
@@ -144,7 +146,8 @@ internal static class YalisalinFireComponentSelectionRegistry
     }
 
     /// <summary>
-    /// 点击「跳过本次添火」：弹出当前队首强化（不应用），切换到下一个允许的添火效果。
+    /// 点击「跳过本次添火」：登记一次跳过（不作用到任何牌），让下一个允许的添火效果顶上。
+    /// 与右键一样，这里只登记，实际推进队首发生在两端的同步回放阶段。
     /// </summary>
     private static void OnSkipStrengthenPressed(NChooseACardSelectionScreen screen)
     {
@@ -152,12 +155,14 @@ internal static class YalisalinFireComponentSelectionRegistry
         if (context == null)
             return;
 
-        if (!context.SkipNextRightClick())
+        if (context.RemainingRightClickCount <= 0)
             return;
+
+        context.RecordRightClickSkip();
 
         var skip = screen.GetNodeOrNull<Godot.Button>(SkipButtonName);
         if (skip != null)
-            skip.Visible = context.PendingRightClicks.Count > 0;
+            skip.Visible = context.RemainingRightClickCount > 0;
 
         UpdatePrompt(screen, context, null);
     }

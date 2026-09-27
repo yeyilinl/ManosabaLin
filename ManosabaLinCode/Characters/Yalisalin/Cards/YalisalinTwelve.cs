@@ -13,7 +13,7 @@ using STS2RitsuLib.Interop.AutoRegistration;
 namespace ManosabaLin.Characters.Yalisalin.Cards;
 
 [RegisterCard(typeof(YalisalinCardPool))]
-public sealed class YalisalinTwelve() : ManosabaCardTemplate(0, CardType.Skill, CardRarity.Uncommon, TargetType.AnyPlayer)
+public sealed class YalisalinTwelve() : ManosabaCardTemplate(0, CardType.Skill, CardRarity.Rare, TargetType.AnyPlayer)
 {
     private const int RequiredSuspectAmount = 2;
 

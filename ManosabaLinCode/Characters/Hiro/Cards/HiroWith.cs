@@ -82,7 +82,7 @@ public sealed class HiroWith : ManosabaCardTemplate
 
         await PowerCmd.Apply<MayhemPower>(
             choiceContext, source.Owner.Creature,
-            source.DynamicVars["ShadowStepPower"].BaseValue,
+            source.DynamicVars["MayhemPower"].BaseValue,
             source.Owner.Creature,
             source,
             false

@@ -18,7 +18,9 @@ namespace ManosabaLin.Characters.Ema.Cards;
 [RegisterCard(typeof(EmalinCardPool))]
 public sealed class StabbingBlade() : ManosabaCardTemplate(2, CardType.Attack, CardRarity.Rare, TargetType.Self)
 {
-  
+    /// <summary>本卡会给选中的攻击牌挂上【魔女化】组件，卡面需带上该组件的悬浮提示。</summary>
+    protected override IEnumerable<IHoverTip> AdditionalHoverTips => Witchification.Tip;
+
     protected override async Task OnPlay(PlayerChoiceContext choiceContext, CardPlay cardPlay, ComponentContext componentContext)
     {
         var owner = Owner;

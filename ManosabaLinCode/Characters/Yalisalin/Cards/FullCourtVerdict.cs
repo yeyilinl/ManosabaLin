@@ -4,7 +4,7 @@ namespace ManosabaLin.Characters.Yalisalin.Cards;
 
 /// <summary>
 /// 全席宣判（2 费技能・稀有）：
-/// 选择任意张手牌原罪进行自惩，其余原罪自动宽恕。
+/// 从所有牌（抽牌堆 / 手牌 / 弃牌堆）中选择任意张原罪进行自惩，其余原罪自动宽恕。
 /// 宽恕次数 &gt; 自惩 → 抽差值张牌；自惩 ≥ 宽恕 → 获得差值能量，失去差值×4 生命。
 /// 升级：失去生命改为 ×3。
 /// </summary>
@@ -21,23 +21,31 @@ public sealed class FullCourtVerdict() : ManosabaCardTemplate(2, CardType.Skill,
         var owner = Owner;
         var creature = owner.Creature;
 
-        var handSins = PileType.Hand.GetPile(owner).Cards
-            .Where(c => c.HasComponent<Originalsin>())
-            .ToList();
-        if (handSins.Count == 0) return;
+        // 「所有牌」= 抽牌堆 + 手牌 + 弃牌堆（不含消耗堆）。
+        var allSins = new List<CardModel>();
+        foreach (var pileType in new[] { PileType.Hand, PileType.Draw, PileType.Discard })
+        {
+            foreach (var card in pileType.GetPile(owner).Cards)
+            {
+                if (card.HasComponent<Originalsin>())
+                    allSins.Add(card);
+            }
+        }
+
+        if (allSins.Count == 0) return;
 
         // 选择要自惩的原罪卡，未选择的自动宽恕。
-        var punishCards = (await CardSelectCmd.FromHand(
+        // 候选可能来自抽牌堆 / 弃牌堆，故用网格选择而非手牌选择。
+        var punishCards = (await CardSelectCmd.FromSimpleGrid(
             choiceContext,
+            allSins,
             owner,
-            new CardSelectorPrefs(SelectionScreenPrompt, 0, handSins.Count),
-            c => c.HasComponent<Originalsin>(),
-            this)).ToHashSet();
+            new CardSelectorPrefs(SelectionScreenPrompt, 0, allSins.Count))).ToHashSet();
 
         var forgiveCount = 0;
         var punishCount = 0;
 
-        foreach (var sin in handSins)
+        foreach (var sin in allSins)
         {
             if ((sin as IComponentsCardModel)?.GetComponent<Originalsin>() is not { } component) continue;
 

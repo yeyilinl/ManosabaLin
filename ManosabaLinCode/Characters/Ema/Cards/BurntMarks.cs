@@ -17,7 +17,7 @@ namespace ManosabaLin.Characters.Ema.Cards;
 [RegisterCard(typeof(EmalinCardPool))]
 public sealed class BurntMarks : ManosabaCardTemplate
 {
-    public BurntMarks() : base(1, CardType.Attack, CardRarity.Common, TargetType.AnyEnemy) { }
+    public BurntMarks() : base(2, CardType.Attack, CardRarity.Common, TargetType.AnyEnemy) { }
 
     public override IEnumerable<CardKeyword> CanonicalKeywords =>
         new[] { EmalinKeywordRules.RebuttalCardKeyword };
@@ -25,7 +25,7 @@ public sealed class BurntMarks : ManosabaCardTemplate
     protected override IEnumerable<DynamicVar> CanonicalVars =>
     [
         new DamageVar(10m, ValueProp.Move),
-        new DamageVar("AoEDamage", 3m, ValueProp.Move)
+        new DamageVar("AoEDamage", 8m, ValueProp.Move)
     ];
 
     protected override async Task OnPlay(PlayerChoiceContext choiceContext, CardPlay cardPlay, ComponentContext componentContext)

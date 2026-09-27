@@ -26,7 +26,7 @@ public sealed class CrossbowBolt : ManosabaCardTemplate
     public override IEnumerable<CardKeyword> CanonicalKeywords =>
         new[] { EmalinKeywordRules.RebuttalCardKeyword };
 
-    protected override IEnumerable<DynamicVar> CanonicalVars => [new DamageVar(5m, ValueProp.Move)];
+    protected override IEnumerable<DynamicVar> CanonicalVars => [new DamageVar(8m, ValueProp.Move)];
 
     protected override async Task OnPlay(PlayerChoiceContext choiceContext, CardPlay cardPlay, ComponentContext componentContext)
     {

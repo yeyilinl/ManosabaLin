@@ -1,9 +1,11 @@
 ﻿using ManosabaLin.Characters.Common.Components;
+using ManosabaLin.Characters.Hiro.Cards;
 
 namespace ManosabaLin.Characters.Yalisalin.Powers;
 
 /// <summary>
-/// 双轨日：任意原罪触发「自惩」后，可对另一张手牌原罪立刻宽恕。
+/// 双轨日：任意原罪触发「自惩」后，可对所有牌（抽牌堆 / 手牌 / 弃牌堆）
+/// 里的一张原罪立刻宽恕。
 /// </summary>
 [RegisterPower]
 public sealed class ShuangGuiRiPower : ManosabaPowerTemplate
@@ -46,12 +48,16 @@ public sealed class ShuangGuiRiPower : ManosabaPowerTemplate
             if (Owner?.Player is not { } player) return;
             if (punished.Owner?.Creature != Owner) return;
 
-            var selected = (await CardSelectCmd.FromHand(
+            var candidates = CollectForgivableCards(player, punished);
+            if (candidates.Count == 0) return;
+
+            // min 0 = 可以选择跳过；候选可能来自抽牌堆 / 弃牌堆，故用网格选择而非手牌选择。
+            var selected = (await CardSelectCmd.FromSimpleGrid(
                 choiceContext,
+                candidates,
                 player,
-                new CardSelectorPrefs(new LocString("powers", $"{Id.Entry}.selectionScreenPrompt"), 0, 1),
-                c => c.HasComponent<Originalsin>() && !ReferenceEquals(c, punished),
-                punished)).FirstOrDefault();
+                new CardSelectorPrefs(new LocString("powers", $"{Id.Entry}.selectionScreenPrompt"), 0, 1)))
+                .FirstOrDefault();
 
             if ((selected as IComponentsCardModel)?.GetComponent<Originalsin>() is { } sin)
                 await sin.Forgive(choiceContext);
@@ -60,5 +66,27 @@ public sealed class ShuangGuiRiPower : ManosabaPowerTemplate
         {
             Log.Error($"ShuangGuiRiPower.OnPunishTriggered failed: {ex}");
         }
+    }
+
+    /// <summary>
+    /// 「所有牌」= 抽牌堆 + 手牌 + 弃牌堆（不含消耗堆）。
+    /// </summary>
+    private static List<CardModel> CollectForgivableCards(Player player, CardModel punished)
+    {
+        var result = new List<CardModel>();
+
+        foreach (var pileType in new[] { PileType.Hand, PileType.Draw, PileType.Discard })
+        {
+            foreach (var card in pileType.GetPile(player).Cards)
+            {
+                if (ReferenceEquals(card, punished)) continue;
+                if (SamePlaceTruth.IsSelectionLocked(card)) continue;
+                if (!card.HasComponent<Originalsin>()) continue;
+
+                result.Add(card);
+            }
+        }
+
+        return result;
     }
 }

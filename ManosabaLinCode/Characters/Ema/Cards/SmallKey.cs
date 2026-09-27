@@ -17,7 +17,7 @@ namespace ManosabaLin.Characters.Ema.Cards;
 [RegisterCard(typeof(EmalinCardPool))]
 public sealed class SmallKey : ManosabaCardTemplate
 {
-    public SmallKey() : base(0, CardType.Skill, CardRarity.Uncommon, TargetType.Self) { }
+    public SmallKey() : base(1, CardType.Skill, CardRarity.Uncommon, TargetType.Self) { }
 
     public override IEnumerable<CardKeyword> CanonicalKeywords =>
         new[] { EmalinKeywordRules.DoubtCardKeyword };

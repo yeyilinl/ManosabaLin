@@ -7,6 +7,7 @@ using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.GameActions.Multiplayer;
+using MegaCrit.Sts2.Core.Localization;
 using MegaCrit.Sts2.Core.Localization.DynamicVars;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Nodes.Cards;
@@ -76,20 +77,27 @@ public sealed class Geinilunhui : ManosabaCardTemplate
             totalRemoved++;
         }
 
-        // 4. 目标队友抽牌堆随机 1 张获得轮回
-        var targetDrawPile = PileType.Draw.GetPile(targetPlayer).Cards;
-        if (targetDrawPile.Count > 0)
+        // 4. 目标友方自己从自己的抽牌堆选 1 张获得轮回
+        //    与本体储君的「指导」(Tutor) 用同一套：CardSelectCmd.FromCombatPile +
+        //    把 player 传成【目标玩家】，于是由目标玩家在自己抽牌堆里翻牌选 1 张
+        //    （抽牌堆会按 稀有度 → Id 稳定排序；只有 1 张时引擎直接返回、不弹屏）。
+        var picked = (await CardSelectCmd.FromCombatPile(
+            choiceContext,
+            PileType.Draw.GetPile(targetPlayer),
+            targetPlayer,
+            new CardSelectorPrefs(new LocString("cards", $"{Id.Entry}.pickPrompt"), 1),
+            static c => !SamePlaceTruth.IsSelectionLocked(c))).FirstOrDefault();
+
+        if (picked is not null)
         {
-            var rng = Owner.RunState.Rng.CombatTargets;
-            var targetCard = targetDrawPile[rng.NextInt(targetDrawPile.Count)];
-            targetCard.AddModKeyword(rebirthKeyword);
-            RefreshCardVisuals(targetCard);
+            picked.AddModKeyword(rebirthKeyword);
+            RefreshCardVisuals(picked);
 
             // 5. 每移除 1 次生成 1 张复制品加入队友抽牌堆，至多 2 张
             var copiesToGenerate = Math.Min(totalRemoved, 2);
             for (int i = 0; i < copiesToGenerate; i++)
             {
-                var copy = CombatState.CreateCard(targetCard.CanonicalInstance, targetPlayer);
+                var copy = CombatState.CreateCard(picked.CanonicalInstance, targetPlayer);
                 copy.AddModKeyword(rebirthKeyword);
                 await CardPileCmd.AddGeneratedCardToCombat(copy, PileType.Draw, targetPlayer);
             }

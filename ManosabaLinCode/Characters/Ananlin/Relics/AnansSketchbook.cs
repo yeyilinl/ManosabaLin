@@ -320,6 +320,114 @@ public class AnansSketchbook : ManosabaRelicTemplate
         return added;
     }
 
+    /// <summary>
+    ///     供「借来的留白书页」（书页打击发给队友的 Token）使用：
+    ///     用发放时快照下来的卡池条目，为<b>实际打出这张书页的玩家</b>生成留白书页选项。
+    ///     <para>
+    ///         这是纯新增入口，不改动 <see cref="UseMarginPage" /> / <see cref="UseBlankPage" />
+    ///         的既有行为 —— 既有书页依旧只认「持有者自己的素描本」。
+    ///     </para>
+    /// </summary>
+    internal static async Task<IReadOnlyList<CardModel>> ResolveBorrowedMarginPage(
+        PlayerChoiceContext choiceContext,
+        CardModel source,
+        Player caster,
+        IReadOnlyList<string> poolEntries)
+    {
+        var pools = poolEntries
+            .Select(static entry => ModelDb.GetByIdOrNull<CardPoolModel>(new ModelId("CARD_POOL", entry)))
+            .Where(static pool => pool is not null)
+            .Select(static pool => pool!)
+            .ToArray();
+        if (pools.Length == 0) return [];
+
+        var rng = caster.RunState.Rng.CombatCardGeneration;
+        var options = RollBorrowedMarginOptions(caster, pools, rng);
+        if (options.Count == 0) return [];
+
+        if (source.IsUpgraded)
+            foreach (var option in options)
+                CardCmd.Upgrade(option);
+
+        var selected = (await CardSelectCmd.FromSimpleGrid(
+            choiceContext,
+            options,
+            caster,
+            new CardSelectorPrefs(source.SelectionScreenPrompt, 0, 1))).ToArray();
+
+        var added = new List<CardModel>();
+        foreach (var card in selected)
+        {
+            await CardPileCmd.AddGeneratedCardToCombat(card, PileType.Hand, caster);
+            added.Add(card);
+        }
+
+        return added;
+    }
+
+    private static IReadOnlyList<CardModel> RollBorrowedMarginOptions(
+        Player caster,
+        IReadOnlyList<CardPoolModel> pools,
+        MegaCrit.Sts2.Core.Random.Rng rng)
+    {
+        for (var attempt = 0; attempt < 12; attempt++)
+        {
+            var selected = new List<CardModel>();
+            var usedIds = new HashSet<ModelId>();
+            var usedRarities = new HashSet<CardRarity>();
+            var rarityOrder = new[] { CardRarity.Common, CardRarity.Uncommon, CardRarity.Rare }
+                .OrderBy(_ => rng.NextFloat())
+                .ToArray();
+            var requiredPools = pools.Count switch
+            {
+                1 => [pools[0], pools[0], pools[0]],
+                2 => new[] { pools[0], pools[1], rng.NextItem(pools) ?? pools[0] },
+                _ => pools.Take(MaxRecordedPools).OrderBy(_ => rng.NextFloat()).ToArray()
+            };
+
+            foreach (var pool in requiredPools)
+            {
+                var card = RollBorrowedMarginOption(caster, pool, rarityOrder, usedRarities, usedIds, rng);
+                if (card is null) break;
+
+                selected.Add(card);
+                usedIds.Add(card.Id);
+                usedRarities.Add(card.Rarity);
+            }
+
+            if (selected.Count == 3)
+                return selected;
+        }
+
+        return [];
+    }
+
+    private static CardModel? RollBorrowedMarginOption(
+        Player caster,
+        CardPoolModel pool,
+        IReadOnlyList<CardRarity> rarityOrder,
+        ISet<CardRarity> usedRarities,
+        HashSet<ModelId> usedIds,
+        MegaCrit.Sts2.Core.Random.Rng rng)
+    {
+        foreach (var rarity in rarityOrder.Where(rarity => !usedRarities.Contains(rarity)))
+        {
+            var cards = pool
+                .GetUnlockedCards(caster.UnlockState, caster.RunState.CardMultiplayerConstraint)
+                .Where(IsRecordableCard)
+                .Where(card => card.Rarity == rarity && !usedIds.Contains(card.Id))
+                .ToArray();
+            if (cards.Length == 0) continue;
+
+            var canonical = rng.NextItem(cards);
+            if (canonical is null || caster.Creature.CombatState is not { } combatState) return null;
+
+            return combatState.CreateCard(canonical, caster);
+        }
+
+        return null;
+    }
+
     internal Task AddSilence(PlayerChoiceContext choiceContext, int amount, CardModel? source)
     {
         return amount <= 0

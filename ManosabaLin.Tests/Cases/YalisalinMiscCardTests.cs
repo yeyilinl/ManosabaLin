@@ -104,4 +104,27 @@ public sealed class YalisalinMiscCardTests : CombatTestSuite
 
         Assert.Equal(1, CardTestAssertions.PowerAmount<Powerfourfour>(Player.Creature));
     }
+
+    /// <summary>
+    /// （Powerfourfour / 魔女监狱）卡面与能力文案都是「<b>回合开始</b>时获得 40 层【魔女化】」。
+    /// 所以打出当回合不该给（旧实现错挂在回合结束），下一个玩家回合开始时才给 40 层。
+    /// </summary>
+    [Fact]
+    public async Task PowerFourfour_grants_witchification_at_next_turn_start()
+    {
+        var card = await AddToHand<YalisalinPowerfourfourcard>();
+
+        await PlayerCmd.SetEnergy(10, Player);
+        await WaitForIdle();
+        await Play(card);
+        await WaitForIdle();
+
+        // 打出当回合还没到「回合开始」，此时不该有【魔女化】。
+        Assert.Equal(0, CardTestAssertions.PowerAmount<WithPower>(Player.Creature));
+
+        await EndTurn();
+        await WaitForIdle();
+
+        Assert.Equal(40, CardTestAssertions.PowerAmount<WithPower>(Player.Creature));
+    }
 }

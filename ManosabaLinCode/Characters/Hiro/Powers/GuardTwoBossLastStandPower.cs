@@ -82,7 +82,14 @@ public sealed class GuardTwoBossLastStandPower : ManosabaPowerTemplate
         if (creature.Monster is GuardTwoBossMonster boss)
             boss.PlayLastStandMusic();
 
-        var block = (Owner.GetPower<WithPower>()?.Amount ?? 0) * BlockMultiplier;
+        // 诈尸护盾不能只按 3×【魔女化】算：BOSS 在打出 ATTACK_3（首次获得【魔女化】）之前
+        // 就可能被即死类效果打空血，此时 3×0 = 0；而紧接着的 BeforeDamageReceived 判定是
+        // 「TriggeredThisTurn && Block <= 0 && Move ⇒ Kill(force: true)」——
+        // 也就是说诈尸刚成立，下一击就会被当成「已破盾」直接真杀。
+        // 因此护盾取 max(3×【魔女化】, 该 BOSS 的常规护盾值)，保证诈尸一定带盾、必须破盾才能击杀。
+        var withAmount = Owner.GetPower<WithPower>()?.Amount ?? 0;
+        var shieldFloor = creature.Monster is GuardTwoBossMonster guard ? guard.ShieldAmount : 0;
+        var block = Math.Max(withAmount * BlockMultiplier, shieldFloor);
 
         InitializeStartingMaxHp();
         await CreatureCmd.SetMaxAndCurrentHp(creature, InfiniteHp);

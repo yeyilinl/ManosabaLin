@@ -91,8 +91,12 @@ public sealed class Emamonv : ManosabaCardTemplate
         var pickResult = await CardSelectCmd.FromSimpleGrid(choiceContext, cards, owner, pickPrefs);
         var picked = pickResult.FirstOrDefault();
 
-        if (picked != null)
-            await CardPileCmd.AddGeneratedCardToCombat(picked, PileType.Hand, owner);
+        if (picked == null) return;
+
+        // 可以免费打出一次：本回合费用为 0，或保留至该牌被打出为止
+        picked.SetToFreeThisTurn();
+
+        await CardPileCmd.AddGeneratedCardToCombat(picked, PileType.Hand, owner);
     }
     protected override void OnUpgrade(ComponentContext componentContext)
     {

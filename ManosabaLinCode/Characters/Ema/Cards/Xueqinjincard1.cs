@@ -39,7 +39,7 @@ public sealed class Xueqinjincard1 : ManosabaCardTemplate
         typeof(Lyshuyuan),
     ];
 
-    public Xueqinjincard1() : base(2, CardType.Attack, CardRarity.Uncommon, TargetType.AnyEnemy) { }
+    public Xueqinjincard1() : base(1, CardType.Attack, CardRarity.Uncommon, TargetType.AnyEnemy) { }
 
     protected override IEnumerable<IHoverTip> AdditionalHoverTips
     {

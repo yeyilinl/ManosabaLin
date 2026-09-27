@@ -22,7 +22,7 @@ public sealed class Theswaplie : ManosabaCardTemplate
 
     protected override IEnumerable<DynamicVar> CanonicalVars =>
     [
-        new CardsVar(1),
+        new CardsVar(2),
         new IntVar("TransformCount", 1)
     ];
 

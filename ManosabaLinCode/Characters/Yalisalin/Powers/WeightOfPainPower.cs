@@ -1,0 +1,60 @@
+﻿using MegaCrit.Sts2.Core.Localization;
+using MegaCrit.Sts2.Core.Saves.Runs;
+
+namespace ManosabaLin.Characters.Yalisalin.Powers;
+
+/// <summary>
+///     痛觉的重量（独立能力）：
+///     每通过余火烧掉 <see cref="Threshold" /> 张牌，本场获得 <c>Amount</c> 点力量。
+///     阈值由卡牌打出时写入（普通 2 / 升级 1）；重复获得时保留更低的阈值。
+/// </summary>
+[RegisterPower]
+public sealed class WeightOfPainPower : ManosabaPowerTemplate
+{
+    private const int DefaultThreshold = 2;
+
+    public override PowerType Type => PowerType.Buff;
+    public override PowerStackType StackType => PowerStackType.Counter;
+
+    [SavedProperty] public int BurnProgress { get; private set; }
+    [SavedProperty] public int Threshold { get; private set; }
+
+    protected override IEnumerable<DynamicVar> CanonicalVars =>
+        [new IntVar("Threshold", DefaultThreshold)];
+
+    public override LocString Description
+    {
+        get
+        {
+            var description = base.Description;
+            description.Add(new IntVar("Threshold", CurrentThreshold));
+            return description;
+        }
+    }
+
+    private int CurrentThreshold => Threshold <= 0 ? DefaultThreshold : Threshold;
+
+    public void ConfigureThreshold(int threshold)
+    {
+        var normalized = Math.Max(1, threshold);
+        Threshold = Threshold <= 0 ? normalized : Math.Min(Threshold, normalized);
+    }
+
+    /// <summary>
+    ///     由遗物的余火「烧掉牌后」钩子转发调用：累计烧牌数，达到阈值时给出 <c>Amount</c> 点力量。
+    /// </summary>
+    public async Task ResolveBurned(PlayerChoiceContext choiceContext)
+    {
+        var owner = Owner;
+        if (owner is null || Amount <= 0)
+            return;
+
+        var threshold = CurrentThreshold;
+        BurnProgress++;
+        if (BurnProgress < threshold)
+            return;
+
+        BurnProgress -= threshold;
+        await PowerCmd.Apply<StrengthPower>(choiceContext, owner, Amount, owner, null, false);
+    }
+}

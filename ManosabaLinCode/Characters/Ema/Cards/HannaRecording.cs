@@ -18,7 +18,7 @@ namespace ManosabaLin.Characters.Ema.Cards;
 [RegisterCard(typeof(EmalinCardPool))]
 public sealed class HannaRecording : ManosabaCardTemplate
 {
-    public HannaRecording() : base(1, CardType.Skill, CardRarity.Uncommon, TargetType.Self) { }
+    public HannaRecording() : base(1, CardType.Skill, CardRarity.Rare, TargetType.Self) { }
 
     public override IEnumerable<CardKeyword> CanonicalKeywords =>
         new[] { EmalinKeywordRules.DoubtCardKeyword };
@@ -41,6 +41,6 @@ public sealed class HannaRecording : ManosabaCardTemplate
 
     protected override void OnUpgrade(ComponentContext componentContext)
     {
-        DynamicVars.Energy.UpgradeValueBy(2);
+        DynamicVars.Energy.UpgradeValueBy(1);
     }
 }

@@ -1,117 +1,88 @@
 # 项目长期记忆 — ManosabaLin
 
-## 本地化（localization）约定
+> **细节优先看技能**（每个都比本文件详细）：本地化 `manosaba-lin-localization`｜卡框/材质 `manosaba-lin-card-visuals`｜战斗测试 `manosaba-lin-combat-tests`｜语音音效 `manosaba-lin-audio`（FMOD 在仓库根 `FMOD/`）｜联机 desync `manosaba-lin-mp-desync`。
+> **另两个不自动注入的文件（要用就 Read）**：`.workbuddy/memory/ENGINE-API.md`（引擎 API + 回合结束顺序）｜`.workbuddy/memory/PITFALLS.md`（发布/验证/本机环境/原罪时点/设计卡面长文）。
+> 设计文档在 `docs/`：`originalsin-refactor-design.md`｜`yalisalin-firecolor-v2-design.md`｜`yalisalin-card-tiers.md`（卡表 v6）｜`yalisalin-card-before-after.md`（新旧对比+反思）。
 
-- 目录：`ManosabaLin/localization/{zhs,eng,jpn,kor,rus}/{cards,powers,relics,enchantments,card_keywords,ancients,events,characters,monsters,encounters,afflictions,orbs,settings_ui,static_hover_tips}.json`
-- **zhs 是源语言**：新增/修改文案先在 zhs 定稿，再同步其他语言。
-- 键命名：
-  - `MANOSABA_LIN_CARD_<SNAKE>` / `MANOSABA_LIN_POWER_<SNAKE>` / `MANOSABA_LIN_RELIC_<SNAKE>` / `MANOSABA_LIN_CHARACTER_<SNAKE>`
-  - `.title` / `.description` / `.flavor` / `.smartDescription` / `.selectionScreenPrompt`
-  - 模型能力：`MANOSABA_LIN_MODEL_CAPABILITY_<SNAKE>.hovertip.title|description`、`.afterBase`、`.afterBaseStrong`
-  - C# 组件走 `LocString("cards", "<LocPrefix>.<suffix>")`，如 `ManosabaLin.YalisalinFireComponent.*`、`ManosabaLin.AnanlinReassuranceMarkCapability.*`
-- 变量占位符必须原样保留：`{Damage}` `{Block}` `{Cards}` `{Energy}` `{Count}` `{Amount}` `{Slot}` `{Prompt}`、`{X:diff()}`、`{IfUpgraded:show:...|...}`、`{energyPrefix:energyIcons(n)}`
-- 富文本标签保留并随语言本地化：`[color=#RRGGBB]` `[b]` `[gold]` `[purple]` `[green]` `[blue]`；各行断行用 `\n`
-- 文件为 **CRLF + 部分带 UTF-8 BOM**；批量改值必须保留行尾与 BOM（用字节级读入/写出，不要 `ensure_ascii=True` 重写整文件）。
+## 项目坐标
 
-### 术语表（务必复用）
+- 项目根 `D:\ManosabaLin`；代码 `ManosabaLinCode/`；本地化 `ManosabaLin/localization/{zhs,eng,jpn,kor,rus}/`。
+- 游戏目录 `D:\Program Files (x86)\Steam\steamapps\common\Slay the Spire 2`（`local.props` 的 `Sts2Dir`；mod 产物 `mods/ManosabaLin/`）。
+- 原版反编译 `.local/probe_engine/decomp/`；库真源码 `.local/external/`。⚠️ `.local/` 被 gitignore ⇒ **全仓检索会跳过，查源码必须显式传 `path=`**。
+- 工具：Bash coreutils + `dotnet` 可用；**PowerShell stdout 不回传**（只有 exit code）。Python 用 venv `~\.workbuddy\binaries\python\envs\default\Scripts\python.exe`。
 
-| 中文 | eng | jpn | kor | rus |
-| --- | --- | --- | --- | --- |
-| 余火 | Embers | 余燼 | 잔불 | угли |
-| 添火 | kindle | 火を加える | 불을 더하다 | добавить огонь |
-| 升温 / 强升温 | Heat Up / Strong Heat Up | 昇温 / 強昇温 | 승온 / 강한 승온 | Нагрев / Сильный нагрев |
-| 魔女化 | Witchification | 魔女化 | 마녀화 | Оведьмление |
-| 亚里沙的魔法 | Alisa's Magic | アリサの魔法 | 아리사의 마법 | магия Алисы |
-| 火色（浅橙/亮黄/赤红/黑红） | Dark Orange / Dark Red / Crimson / Blackened Red Char | 暗橙 / 暗紅 / 真紅 / 黒紅 | 어두운 주황 / 어두운 빨강 / 새빨강 / 검붉은 탄화 | тёмно-оранжевый / тёмно-красный / алый / чёрно-красный |
-| 嫌疑 | Suspicion | 容疑 | 의혹 | Подозрение |
-| 缄默 | Silence | 沈黙 | 침묵 | Молчание |
-| 封存火色 | Sealed Fire | 封存火色 | 봉인 화색 | запечатанный огонь |
-| 魔女监狱 | Witch Prison | 魔女監獄 | 마녀 감옥 | Тюрьма ведьм |
-| 魔女之力 | Witch's Power | 魔女の力 | 마녀의 힘 | Сила ведьмы |
-| 魔女仪式 | Witch Ritual | 魔女儀式 | 마녀 의식 | Ритуал ведьмы |
-| 无实体 / 虚空形态 / 死神形态 | Intangible / Void Form / Reaper Form | 無実体 / 虚空形態 / 死神形態 | 무형 / 공허 형태 / 사신 형태 | Бестелесность / Форма пустоты / Форма смерти |
-| 怀旧 / 他人的情绪 | Nostalgia / Others' Emotions | 懐旧 / 他者の感情 | 향수 / 타인의 감정 | Ностальгия / Эмоции других |
-| 书本中的真相 | Truth Within the Pages | 書物の中の真実 | 책 속의 진실 | Истина в книгах |
-| 疑心暗起 / 誓言 | Suspicion Arises / Oath | 疑心暗鬼 / 誓い | 의심이 싹트다 / 맹세 | Зарождающееся подозрение / Клятва |
-| 试镜 / 安心 | Audition / Peace of Mind | オーディション / 安心 | 오디션 / 안심 | Прослушивание / Спокойствие |
-| 搬石 / 移除 | Stone Hauling / Remove | 石運び / 取り除き | 돌 나르기 / 제거 | Камень преткновения / Удалить |
-| 泽度可可 / 黑部奈叶香 / 莲见蕾雅 | Sawado Koko / Kurobe Nayuka / Hasumi Reiya | 沢渡ココ / 黒部ナユカ / 蓮見レア | 사와도 코코 / 쿠로베 나유카 / 레아 | Коко Савадо / Наёка Куробэ / Лея Хасуми |
-| 紫藤亚里沙 | Wisteria Arisa（卡面用 Alisa） | 紫藤アリサ | 위스테리아 아리사 | Ариса Фудзито |
+## 本地化
 
-## 复用工具（`.local/tools/`）
+- **zhs 是源语言**，先定稿 zhs 再同步其余 4（改了不同步 = 静默不一致，没人会报错）。
+- 键 `MANOSABA_LIN_{CARD,POWER,RELIC,CHARACTER}_<SNAKE>` + `.title/.description/.flavor/.smartDescription`；`<SNAKE>`=`NormalizePublicStem`（**数字不拆词**）；奖励 `MANOSABA_LIN_REWARD_<SNAKE>`；卡效果悬浮提示键自定 `<卡键>_EFFECT`（放 `cards.json`）。
+- 占位符原样保留 `{Damage}`/`{Amount}`/`{Stacks}`/`{X:diff()}`/`{IfUpgraded:…}`；富文本 `[color=#RRGGBB]`/`[b]`。卡牌层数 `{Stacks}`、能力层数 `{Amount}`。⚠️ **`{Var}` 取 `BaseValue`、`{Var:diff()}` 取 `PreviewValue`，别把 `:diff()` 简化掉**。改完校验 `json.loads` + CRLF 数 == LF 数。
+- **同一效果常有「能力 + 卡牌」两份逐字相同的文案** ⇒ 改机制措辞两份都改。
+- **表名必须是原版已有的表**：奖励文案 `gameplay_ui`、悬浮提示 `static_hover_tips`；未支持语言走 eng 回退链；无需 `.import`。
+- **能量**：动态 `{Energy:energyIcons()}`／能力层数 `{Amount:energyIcons()}`／固定 `{energyPrefix:energyIcons(N)}`（分支表见技能 §4b）。铁律：**没注入过变量的描述不能写占位符**（抛 `LocException`）。既有 **`N点⚡`**（约 15 处）是**有意约定，别统一**。
+- **未同步缺口**：`…CARD_ASHINPAGES.description` 的 eng/jpn/kor/rus 仍是旧中文；⚠️ **eng/kor 的 `cards.json` 有大片条目至今仍是中文原文**（`GUARDIAN_OATH`/`COCO_ESTRANGEMENT` 等）⇒ 查术语译法别拿这两个文件当权威。
+- **卡面「升级后」怎么还原**（改任何卡前要看得见新旧两版）：
+  `{X:diff()}` 显示**升级后数值**（只靠颜色标绿，不写「7→10」）；`{IfUpgraded:show:A|B}` **未升级取 B、升级后取 A**（A 是升级后才有的内容）；
+  `EnergyCost.UpgradeBy(-1)` 只降费、文本不变；`AddKeyword(Innate)` 只加固有、文本不变。
+  ⇒ 升级后卡面 = `zhs/cards.json` 模板 + 该卡 `.cs` 的 `CanonicalVars` / `OnUpgrade` / `IsUpgraded`。
+  批量脚本 `.local/dump_card_digest.py`（产物 `.local/card_upgrade_digest.txt`）。
+  ⚠️ 卡类 `CanonicalVars` 用 **`[...]` 集合表达式**（不是 `{}`）⇒ 正则抓取必须做 `{}`/`[]`/`()` 三种括号平衡，否则抓到的是 `OnPlay` 方法体。
 
-- `loc_gap_report.py <filefilter> <keyfilter>` — 5 语言键缺失/空值对比
-- `cjk_leak_check.py` — 检出非中文语言里残留中文（jpn 会有大量误报，需人工判断）
-- `code_loc_audit.py` — 代码引用的本地化键 vs JSON 实际键
-- `power_key_check.py` — C# Power 类 → `MANOSABA_LIN_POWER_*` 键覆盖检查
-- `fix_fire_loc.py` / `fix_ability_loc.py` — 按 key 精确替换值的模板（保 BOM/CRLF + `\n` 规范化）
-- `untranslated_scan.py` / `untranslated_breakdown.py` — 全库未翻译条目扫描（「值==zhs 原文且含中文」）
-- `ability_union_dump.py` — 能力键 5 语言并集对照，判断缺口用
-- `verify_ability_loc.py` — 残留 / 占位符 / 改动范围 / BOM / 行尾 四项校验
-- `check_eol.py` — 行尾风格回归检查
+## 源码与引擎 API（要点）
 
-## 易踩的坑
+- 完整速查见 `ENGINE-API.md`。三条最容易踩：
+  - `PowerModel.Owner` 就是 `Creature`（写 `Owner.Creature` 报 CS1061）；
+  - `PowerCmd.Apply<T>` 返回 `T?` **必判空**；
+  - 限伤挂 `Hook.ModifyHpLost`，而 `SetCurrentHp`/`Kill` **绕过**限伤。
 
-- **未翻译判据要用「值 == zhs 原文 且含中文」**，不要用「含中文」——否则 eng 的正常译文会被大量误报。
-- **jpn 的"无假名且含汉字"绝大多数是合法日文**（魔女監獄 / 疑心暗鬼 / 洗脳 / 絆 / 正義 / 真実 / 昇温…），
-  必须逐条人工确认；`封存火色` 是 jpn 既有约定（全库 32 处），不要改成 封印。
-- 能力键缺失要双向查：JSON 里没有该键 ≠ 代码引用了错的键；也要查「键在但值是中文」。
-- `MANOSABA_LIN_CARD_*_EFFECT`、`MANOSABA_LIN_RELIC_*` 这类字符串在代码里也可能是**卡牌/遗物 ID**，不一定是本地化键。
-- `afterBase` 是卡面追加文字（不是 hover），`hovertip.*` 才是悬浮提示。
-- **`ManosabaLin.YalisalinFireComponent.enhancement.*` 是余火组件悬浮提示的追加条目**
-  （由 `YalisalinFireComponentCapability.CreateHoverTip` 用 `"\n- "` 拼进 description，
-  来源 `YalisalinsHairpin.GetFireComponentEnhancementDescriptions`），**不是能力本地化**、
-  不需要 Power 级条目。其中 `dazzlingTolerance` / `burnedApology` / `warmthShouldNotStay`
-  由 Power 驱动，对应的 `MANOSABA_LIN_POWER_*` title/description 已于 2026-09-20 删除（重复条目）；
-  其余 4 条（`absentThirteenth` / `painKeeper.count` / `separatedEnds` / `unneededGoodChild`）与 Power 无关。
-- 卡片 hover 能力说明由能力自身/loc 决定，**不要**为补本地化而往卡牌上加 hover 提示。
-- **「回合开始时（在手牌中）」类效果用卡牌的 `AfterPlayerTurnStart(choiceContext, player, componentContext)` 钩子**
-  （先例：`EmaForgottenOne`、`WitchBurn`、`EmptyHouse`）；该钩子对战斗中的卡牌模型触发，
-  不保证只在手牌，需自己判定 `Pile?.Type == PileType.Hand`。
-- **变身类效果优先用基底的 `CardCmd.Transform(original, replacement)`**（原牌位替换 + 变身表现，
-  先例：`EmaEnding`、`Xueqinjincard1`、`Hiroshuyuanpower`、`AnanlinMiliaAssist`）；
-  调用前必须守卫 `original.IsTransformable` 与 `CombatState != null`，否则抛 `InvalidOperationException`。
-  可选选择用 `new CardSelectorPrefs(prompt, 0, 1)`（min 0 = 「可以」选择）。
-- **复制一张战斗中的牌一律用 `source.CreateClone()`（`CardModel.CreateClone`），不要用
-  `CombatState.CreateCard(CanonicalInstance, owner)` + 手动升级**——后者只带基础牌 + 升级等级，
-  会丢附魔 / 幻附魔 / 关键词改动 / 费用改动 / MinionLib 组件。
-  `CreateClone` = `MutableClone()`（`MemberwiseClone` + `DeepCloneFields` + `AfterCloned`），
-  上述全部带齐并重置 `DeckVersion`/事件，设 `ExhaustOnNextPlay = false`、`CloneOf = 原牌`；
-  原版 `DualWield` 用的就是这条路径。`IsClone` 语义是"继承原牌当前状态、跳过一次性初始化"，是有益的。
-  注意 `AddGeneratedCardToCombat` 要求传入的牌 `Pile == null`。
-- **游戏源码副本在 `.local/probe_engine/decomp/` 与 `.local/probe_engine/full/sts2.decompiled.cs`**
-  （`AGENTS.local.md` 里的 `D:\33` 已失效，2026-09-20 确认不存在）。查基底 API 用这里。
-- 构建时若 `SlayTheSpire2.exe` 正在运行，`CopyMod` 目标会因 DLL 被锁而报 `MSB3027/MSB3021`
-  ——这是部署失败，不是编译失败；关游戏后重新 build 即可。
-- 判断某 Power 是否会在战斗中出现：看它有没有覆写 `IsVisibleInternal`。
-  `ManosabaPowerTemplate` 默认 `StackType != None` 即显示；`Originalsin*CounterPower` 等
-  「隐藏」能力都显式写了 `=> false`。
-- **写本地化 JSON 的两条硬规矩**（历史脚本踩过）：
-  1. 行尾必须跟随文件既有风格 —— 本地化 JSON 主体是 **CRLF**，逐行替换时别只写 `\n`，
-     否则产生混合换行（会让 git diff 变成整文件噪声）。
-  2. 缩进按文件既有风格 —— `zhs/powers.json` 通体用 **制表符**，其余语言 powers.json 用 2 空格。
-  处理方式：字节级读入 → 只改目标行 → 原样写出；改完用换行符计数核对（CRLF 数应等于 LF 数）。
+## 战后奖励（自定义 Reward）
 
-## 本机环境 / 游戏存档（2026-09-21 定）
+- 追加唯一 API `CombatRoom.AddExtraReward(Player, Reward)`；`OfferRoomEndRewards()` **逐玩家**读 `ExtraRewards[player]` ⇒ 「每个玩家都要」必须每人各加一条。
+- 排序按 `Reward.RewardsSetIndex` 升序（Gold=1/Potion=2/Relic=3/SpecialCard=4/Card=5/RemoveCard=7）⇒ **自定义用 `0` 排最前**。
+- RitsuLib：继承 `ModCustomReward`（基类 `RewardsSetIndex=>9`，**必须覆盖**），`ModRewardRegistry.For(ModId).RegisterOwned(stem,(save,player,json)=>new X(player))`；id=`MANOSABA_LIN_REWARD_<NORMALIZE(stem)>`。**必须在 `MainFile.Initialize()` 注册**（读档靠前缀 `RewardFromSerializableExtPatch`→`TryCreate`）。先例 `Hiro/Rewards/GuardOneBossUpgradeReward.cs`。
+- `OnSelect()` 在**每台机器**都跑 ⇒ **副作用必须确定性**，只用 `CardSelectCmd.*`（内含 `PlayerChoiceSynchronizer`），别自弹 UI、别用本地随机。
+- ⚠️ **`NDeckUpgradeSelectScreen` 会卡死**：确认要求 `已选数 >= prefs.MaxSelect` ⇒ **MaxSelect 先按可升级张数收窄**（`Math.Min(2,count)`），`count==0` 直接 `return true`。
+- **拿不到已死 BOSS**：`Hook.AfterCombatEnd`/`IterateHookListeners` 只遍历还在 `_allies`/`_enemies` 里的生物 ⇒ 「击杀 BOSS」用 **`MonsterModel.AfterDeath`**（`wasRemovalPrevented` 会先以 true 来一次）。
+- ⚠️ **`AfterDeath` 里别做「奖励屏 / 玩家选择」这类重流程**：引擎防死分支是**先 `Hook.AfterDeath(true)`、后 `Hook.AfterPreventingDeath`** ⇒ 里面 `RewardsCmd.OfferCustom` 会把「防死/诈尸」整段吃掉，症状是「诈尸音效都响了却原地暴毙」。覆写 `AfterDeath` 必须先判 `wasRemovalPrevented`（先例 `GuardTwoBossMonster`）。诈尸护盾别写成 `某能力层数 × N`（层数可能还没建立 ⇒ 0 盾被 `Block <= 0` 的「破盾即杀」立刻打死），要有下限。
 
-- **Bash 工具的 coreutils 全不可用**：`ls` / `grep` / `wc` / `head` / `date` 一律 `command not found`
-  （`PortableGit\...\shim` 里 `dirname` 都缺失）。要跑 shell 逻辑只能用 PowerShell；
-  文件查找/内容搜索改用 Glob / Grep 工具。
-- **PowerShell 工具的 stdout 不回传**（返回只有 `exit code`）。
-  需要看输出时一律 `... | Set-Content -Encoding UTF8 <临时文件>`，再用 Read 工具读。
-- **游戏存档真实路径**：`%APPDATA%\SlayTheSpire2\steam\<steamid>\modded\profile1\saves\`
-  （不是 `%APPDATA%\SlayTheSpire2\default\<n>\`！后者是旧档案残留）。
-  确认方法：日志里搜 `Profile-scoped data path initialized:`。
-- 存档 JSON 格式：**2 空格缩进 + 纯 CRLF + 无 BOM**。改档只能
-  `ReadAllText` → 字符串替换 → `UTF8Encoding($false)` 写回；
-  **禁止 `ConvertTo-Json` 往返**（会重排、重转义整个文件）。
-- 游戏对自己的存档有 `*.FUT.corrupt` / `*.VAL.corrupt` 隔离命名；
-  `current_run.save` 没被改名说明游戏自身校验是通过的。
-- 读档失败定位法：看 `current_run.save` 的 mtime 有没有被改写
-  （`SetUpSavedSingleplayer` → `IncrementNumReloads` 会写档）；没改写 ⇒ 炸在
-  `RunState.FromSerializable`。其内部顺序是**先 players 后 acts**，由栈可直接区分。
-- **`RoomSet.FromSave`（`MegaCrit.Sts2.Core.Rooms/RoomSet.cs:144`）对
-  `EventIds` / `NormalEncounterIds` / `EliteEncounterIds` 裸调 `.Select()`**：
-  任何 mod 的自定义 act 只要这三个列表为 null，读档就抛
-  `ArgumentNullException (Parameter 'source')`，整个 run 再也读不回来。
-  `HouseOfSpidersRyoshu` 的 `SpiderNestAct`（手写 3 节点图：ancient→shop→rest→boss）就是这种情况。
+## 发布与验证（结论，细节见 PITFALLS.md）
+
+- 发布 `dotnet publish ManosabaLin.csproj`（走 `.sln` 报 MSB4126）；重导 PCK 先 `unset STS2_SKIP_PCK_EXPORT`；只验编译 `-t:Compile`。
+- ⚠️ 产物判据：md5 等于 `.godot/mono/temp/bin/ExportRelease/win-x64/ManosabaLin.dll`（~2.6MB）才是 Release 版；`-t:Compile`/跑测试会把它换回 Debug。
+- ⚠️ **新增/替换美术资源或本地化键后必须重发布**（测试与游戏都读游戏目录 PCK）⇒ 否则 `ResourceLoader.Exists` false（卡框静默不挂）或 `Missing localization key`。
+- ⚠️ **用户不要把时间花在无头测试上**：以原版反编译源码 + 本项目现有写法为准，保证 `-t:Compile` 0 错误 + `publish` 通过即可；别改 ASSERT 迁就 harness。
+- ⚠️ **工作区会有并发编辑者**：publish 前 `find ManosabaLinCode ManosabaLin.Tests ManosabaLin/localization -newermt "<上次构建时间>" -type f \( -name '*.cs' -o -name '*.json' \)`；有别人 WIP 就别发布，改用 `ilspycmd` 只验自己的类型。
+- 验产物有没有自己的字符串：`grep -a` 对 .NET DLL **永远 0 命中**（UTF-16）⇒ 用 Python `b.count(k.encode('utf-16-le'))` 或 `ilspycmd -t <类型>`。
+- ⚠️ **改「今天新加、还没进 git HEAD」的键前先备份**；**还原文件一律 `cp -f`，绝不 `rm -rf` 目录**。
+
+## 联机 desync
+
+- 详见 `manosaba-lin-mp-desync`。两条最贵的教训：① 「本地 UI/输入直接改 run state」是 grep 不到的根因；② **多人下一切"随机"必须走 `Owner.RunState.Rng.*`**，禁 `Random.Shared`/`new Random()`/依赖实例 id 与隐式顺序。
+- 判据：**动作序列一致 + 差异只在牌堆/数值 ⇒ 本地随机；序列不一致 ⇒ 只在单侧触发的 hook**。
+
+## 常用设计范式（要点，长文见 PITFALLS.md）
+
+- **卡面基准**：本项目 `.description`（含富文本）**p25=75 / 中位=107 / p75=169**。档位：基础 1 动作 ~45 / 白 2 动作 80~110 / 蓝 3 动作 110~160 / 金 3~4 动作 150~210。诅咒/自动触发类仍要短（40~90）。
+- **加厚 ≠ 加分支**：该禁的是嵌套条件 / 循环 / 概率链 / 隐藏状态 / 自动触发卡上的选择 UI；加厚靠**加动作数 + 加修饰语**。
+- **抓位**：玩家缺什么抓什么，每张卡必须有且只有一个抓位理由、不与任何卡重复；**蓝比金好拿 ⇒ 蓝才是构筑主力**，蓝卡必须做白卡做不到的事（功能差异而非数值差异）。
+- **硬约束**：① 卡数 = 抓位数；② 禁「抽 1 张 / 获得 X 格挡」当填料（除非该卡抓位本身就是过牌/防御）；③ 每张 2~3 动作，加厚部分必须是核心功能的**延伸/放大/回报**——删掉第二效果后由"有性格"变"白板"即填料。
+- ⚠️ **改任何卡之前先读它的原卡面（未升级版 + 升级版）**，回答"它原来解决什么问题"；原设计已解决独特问题就保留独特性、只简化表达。别为了统一模板磨平它（三条实例见 `docs/yalisalin-card-before-after.md`）。⭐ **实例教训**：`KuanShuYinJi`/`NiNiZhiZheng`/`XingJiaJiaShen`/`ZhiMingHuanYa` 四张我套模板磨平了原设计，被对比表打回。
+- **艾玛「审判」体系**：【审判】= `Agreement`/`Rebuttal`/`Doubt` 三种附魔的统称；亲近/疏远 = `BondPower.Affinity/.Estrangement`。附魔计数用 `EmalinCombatHelper`：数「种」→ `GetDistinctEnchantmentTypesThisTurn`（≤3），数「张」→ `GetTotalEnchantmentPlaysThisTurn` / `Get{Agreement,Rebuttal,Doubt}PlaysThisTurn`；**卡面写「N种」就必须用 distinct**。免费打出用 `card.SetToFreeThisTurn()`；读费用 `card.EnergyCost.GetResolved()`。
+- **组件悬浮提示**：`KeywordLikeComponent` 子类自带 `HoverTips`，键 `ManosabaLin.{ComponentId}.hovertip.title/.description`。卡面显示：`public static IHoverTip[] Tip => GetHoverTip<T>();` + 卡里 `AdditionalHoverTips => XxxComponent.Tip;`（先例 `RetainCounterComponent.Tip`）。⚠️ `RemoveOnPlayComponent.Tip` 例外，是 `static readonly` **字段**。
+- **「卡面只留风味文本」范式**：卡加进 `LyXlTypePlaquePatch.RemovesTypePlaque` 白名单 + `AncientTextBgPath` 用 8×8 全透明图 + `.description` 只写风味、效果搬去 `_EFFECT` 悬浮提示。⚠️ **`CardRarity.Ancient` 不会自动去掉类型牌匾**。步骤见 `manosaba-lin-card-visuals` §7。
+- **静态挂组件**：`CanonicalComponents => [new XxxComponent()]`；运行时 `card.TryAddComponent(...)`。先例：`SilverBlazeToken`/`EmotionMimic`/`RetainGrant`（静态）、`PerpetualFrenzy`/`RetainAmplify`（运行时）。
+- ⚠️ **【魔女化】是两个东西**：`WithPower`（层数资源）vs `Witchification` **组件**（`ModifyCardPlayCount +1`，仅 `StabbingBlade` 挂）。改措辞前先确认指哪个。
+
+## 火色 v2（**已定稿**，细节见 `docs/yalisalin-issue-firecomponent-firecolor.md` §五/§六 + `docs/yalisalin-firecolor-v2-design.md`）
+
+- **定稿口径**：挂在**敌人**身上 **6 格**；**格位定色** 1-2 浅橙 / 3-4 亮黄 / 5-6 赤红；**给**由**卡牌效果**给（**攻击不再自动给**）从第 1 格往上填；**消耗**从**最新格（已填最高格）**开始；**同色**两段连续才有额外收益；三色数值**照抄当前 `zhs/relics.json` 的 `fireColor.*.description`**。
+- ⭐ **格位定色 ⟺ 从最新/最高格消耗**（填 1→6 + 消耗 6→1 ⇒ 量表恒为 `{1..n}` 连续前缀、无空洞）。若改成 FIFO 从第 1 格消耗，要么留前洞让新火色插队，要么左对齐压缩使"第 3 格亮黄移到第 2 格(浅橙)"与格位定色冲突。**"要不要压缩"因此不是待裁项，是方向决定的推论。**
+- ⚠️ **代码方向是反的**：`YalisalinFireColorGauge.Consume`（`YalisalinsHairpin.cs:1483`）取 `ordered[0]`（`Order = ++conversionSequence` ⇒ 最早格）。本地化「造成伤害会消耗最新火色」**是对的**，**要改代码**。
+- **21 张卡面已定稿**（用户直给，`issue §六`）：封存 / 升温（强升温）机制**全删但卡全保留**（`firecolor-v2-design.md` §3.3 的"删 8 张"作废）；"连续"统一成**同色**（原 `Unusedconclusion`/`Samewrongproblem`/`BoundPrometheus` 的"不同色"全改）。
+- **「予燎」= 给予火色**；给予超出 6 格 ⇒ **一次性**按消耗顺序补结算（超出 N 格结算 N 次）。⚠️ `Tomorrowburn` 例子写"超出一格触发一次**浅橙**"与"从最新格(=赤红)"矛盾，**未裁**。
+- ⚠️ 基础牌 `Attack`/`Defend` 卡面**没变** + "火色只由卡牌效果给" ⇒ **起手没有任何给火色的途径**（未裁：是否给 `Defend` 加"给予 1 格"）。
+
+## 原罪诅咒 / 时点（要点，深度见 PITFALLS.md）
+
+- 【原罪诅咒】回合结束**自动保留**（`BeforeSideTurnEndPostfix` → `GiveSingleTurnRetain`），**保留后立刻**触发「宽恕」（`AfterSideTurnEndPostfix`）；「自惩」只在**打出**时触发。14 张卡共用一份 `Originalsin` 组件。
+- **「下回合开始时 X」必须延迟执行**：触发者**当场只登记**，效果在下一个玩家回合开始时跑 ⇒ 专用**隐藏**能力（`StackType.Counter` + `IsVisibleInternal => false` + `AfterPlayerTurnStart`）。先例 `OriginalsinWitchificationLossPower` / `OriginalsinMiliaReturnPower`（`Common/AncientCurses/Powers/`）。三类别混：①下回合开始做 X → 专用能力；②下回合获得能量 → 原版 `EnergyNextTurnPower`；③下回合**当你 XXX 时** → 条件钩子 + 已用标记。
+- **四条结构债**（详见 `docs/originalsin-refactor-design.md`）：① `Originalsin.cs` 944 行 switch 分发器 + 基类 13 行空壳 ⇒ 加一张卡动 6 处；② 同一张诅咒两种形态（组件默认不挂，靠 9 张亚里沙卡手动挂 ⇒ 从别处得到 = 废牌）；③ `ForgiveTriggered`/`PunishTriggered` 是**静态事件 + 6 个 `async void` 订阅者**且不过滤 owner ⇒ desync 高风险，新监听器别写 `async void`；④ 宽恕/自惩计数两套并行（通用 Power 只有本场总量；「本回合/上回合」写在**亚里沙发夹**的 6 个 `[SavedProperty]` 上 ⇒ 非亚里沙取不到）。

@@ -3,13 +3,16 @@ using ManosabaLin.Characters.Hiro.Powers;
 using ManosabaLin.Characters.Yalisalin;
 using ManosabaLin.Characters.Yalisalin.Capabilities;
 using ManosabaLin.Characters.Yalisalin.Cards;
+using ManosabaLin.Characters.Yalisalin.Components;
 using ManosabaLin.Characters.Yalisalin.Powers;
 using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Powers;
 using MegaCrit.Sts2.Core.Localization;
+using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Monsters;
 using MegaCrit.Sts2.Core.Models.Powers;
+using System.Text.RegularExpressions;
 using TestTheSpire;
 using STS2RitsuLib.Models.Capabilities;
 using Xunit;
@@ -67,15 +70,17 @@ public sealed class YalisalinFireComponentTests : CombatTestSuite
         Assert.NotNull(heat);
 
         // 2) 运行时本地化键必须可解析（这正是 GetDescriptionFragments 依赖的键）
+        //    注意：文案里可能带富文本标记（如 [color=#ff0000]升温[/color]），
+        //    这里剥掉标记再比对，免得以后只调颜色就把这条测试弄红。
         var afterBase = LocString.GetIfExists("cards",
             "MANOSABA_LIN_MODEL_CAPABILITY_YALISALIN_HEAT_WORD.afterBase");
         Assert.NotNull(afterBase);
-        Assert.Equal("升温", afterBase.GetRawText());
+        Assert.Equal("升温", StripTextMarkup(afterBase.GetRawText()));
 
         var afterBaseStrong = LocString.GetIfExists("cards",
             "MANOSABA_LIN_MODEL_CAPABILITY_YALISALIN_HEAT_WORD.afterBaseStrong");
         Assert.NotNull(afterBaseStrong);
-        Assert.Equal("强升温", afterBaseStrong.GetRawText());
+        Assert.Equal("强升温", StripTextMarkup(afterBaseStrong.GetRawText()));
 
         // 末尾打出一次，满足 TestTheSpire 的"至少执行 1 个战斗动作"校验（否则整批 TERMINATE）。
         var enemy = EnemyAt(0);
@@ -304,4 +309,106 @@ public sealed class YalisalinFireComponentTests : CombatTestSuite
 
         Assert.Equal(10, Player.Creature.Block);
     }
+
+    /// <summary>
+    /// （余火右键·联机同步编码回归）——右键「添火」在联机下必须走同步通道：
+    /// UI 侧只登记 <c>RightClickRecords</c>（<c>0</c> = 跳过，<c>n &gt; 0</c> = 作用在
+    /// <c>ChoiceOptions[n-1]</c>），两端拿同一份索引回放才会得到相同的 <c>AppliedRightClicks</c>。
+    ///
+    /// 2026-09-25 的联机不同步根因正是「右键直接改本机 context」：
+    /// 房主白拿 1 层紫藤亚里沙的魔法 + 1 点能量，客机什么都没有 ⇒ checksum #102 分歧。
+    /// 这条用例锁住修复后的编码与 FIFO 回放语义。
+    /// </summary>
+    [Fact]
+    public async Task FireComponent_right_click_records_encode_and_replay_identically()
+    {
+        var source = await AddToHand<Glasshug>();
+        var other = await AddToHand<YalisalinDefend>();
+        var component = source.GetOrCreateCapability<YalisalinFireComponentCapability>();
+
+        var context = new YalisalinFireComponentContext(Player, NewCardPlay(source), component);
+        context.AddChoiceOption(source);
+        context.AddChoiceOption(other);
+
+        // 队首有两个待应用强化：第一个右键给「other」，第二个直接跳过。
+        context.AddRightClickRequest(new YalisalinFireRightClickRequest(
+            YalisalinFireRightClickKind.PainKeeper, "test.painKeeper"));
+        context.AddRightClickRequest(new YalisalinFireRightClickRequest(
+            YalisalinFireRightClickKind.PainKeeper, "test.painKeeper"));
+        Assert.Equal(2, context.RemainingRightClickCount);
+
+        context.RecordRightClickApplication(other);
+        context.RecordRightClickSkip();
+
+        // 编码：other 是 ChoiceOptions[1] ⇒ 2；跳过 ⇒ 0。
+        Assert.Equal([2, 0], context.RightClickRecords.ToArray());
+        Assert.Equal(0, context.RemainingRightClickCount);
+
+        // 本机走的是「刚发给对手的那份列表」，远端走的是收到的那份 —— 回放结果必须一致。
+        context.ApplyRightClickRecords(context.RightClickRecords);
+
+        var applied = Assert.Single(context.AppliedRightClicks);
+        Assert.Equal(YalisalinFireRightClickKind.PainKeeper, applied.Kind);
+        Assert.Same(other, applied.Card);
+        Assert.Empty(context.PendingRightClicks);
+
+        // 末尾打出一次，满足 harness 的「至少 1 个战斗动作」校验（否则整轮 TERMINATE）。
+        await PlayerCmd.SetEnergy(10, Player);
+        await WaitForIdle();
+        await Play(other);
+    }
+
+    /// <summary>越界/超长的索引不能被回放，也不能把队首卡死（防远端脏数据）。</summary>
+    [Fact]
+    public async Task FireComponent_right_click_records_ignore_out_of_range_indexes()
+    {
+        var source = await AddToHand<Glasshug>();
+        var other = await AddToHand<YalisalinDefend>();
+        var component = source.GetOrCreateCapability<YalisalinFireComponentCapability>();
+
+        var context = new YalisalinFireComponentContext(Player, NewCardPlay(source), component);
+        context.AddChoiceOption(source);
+        context.AddChoiceOption(other);
+        context.AddRightClickRequest(new YalisalinFireRightClickRequest(
+            YalisalinFireRightClickKind.PainKeeper, "test.painKeeper"));
+
+        // 99 越界、-5 非法：都只推进队首，不产生任何效果，也不抛异常。
+        context.ApplyRightClickRecords([99, -5]);
+
+        Assert.Empty(context.AppliedRightClicks);
+        Assert.Empty(context.PendingRightClicks);
+
+        // 回放条数多于队列长度时多余的条目要被忽略掉。
+        context.AddRightClickRequest(new YalisalinFireRightClickRequest(
+            YalisalinFireRightClickKind.PainKeeper, "test.painKeeper"));
+        context.ApplyRightClickRecords([1, 1, 1]);
+        Assert.Single(context.AppliedRightClicks);
+        Assert.Empty(context.PendingRightClicks);
+
+        await PlayerCmd.SetEnergy(10, Player);
+        await WaitForIdle();
+        await Play(other);
+    }
+
+    private static CardPlay NewCardPlay(CardModel card) => new()
+    {
+        Card = card,
+        Player = card.Owner,
+        Target = null,
+        ResultPile = PileType.Discard,
+        Resources = new ResourceInfo
+        {
+            EnergySpent = 0,
+            EnergyValue = card.EnergyCost.GetAmountToSpend(),
+            StarsSpent = 0,
+            StarValue = Math.Max(0, card.GetStarCostWithModifiers())
+        },
+        IsAutoPlay = false,
+        PlayIndex = 0,
+        PlayCount = 1
+    };
+
+    /// <summary>剥掉富文本标记（<c>[color=#rrggbb]</c>、<c>[/color]</c>、<c>[b]</c> 等），只留纯文本。</summary>
+    private static string StripTextMarkup(string text) =>
+        Regex.Replace(text, @"\[/?[A-Za-z]+(=[^\]]*)?\]", string.Empty);
 }

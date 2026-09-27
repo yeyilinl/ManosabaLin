@@ -58,8 +58,10 @@ public sealed class CardEightyFivePower : ManosabaPowerTemplate
 
             source.Flash();
 
-            // 对随机一个敌人造成伤害
-            var target = enemies[Random.Shared.Next(enemies.Count)];
+            // 对随机一个敌人造成伤害。
+            // 联机下必须用同步 RNG：Random.Shared 是进程本地随机，房主/客机会选中不同敌人，
+            // 导致 AfterCardPlayed 检查点状态分歧（RitsuLib StateDivergence → 踢客机）。
+            var target = source.CombatState.RunState.Rng.CombatTargets.NextItem(enemies) ?? enemies[0];
 
             await CreatureCmd.Damage(
                 context,

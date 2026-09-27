@@ -6,6 +6,7 @@ using ManosabaLin.Characters.Ema.Cards;
 using ManosabaLin.Characters.Emalin;
 using ManosabaLin.Characters.Hiro;
 using ManosabaLin.Characters.Hiro.Cards;
+using ManosabaLin.Characters.Hiro.Rewards;
 using ManosabaLin.Characters.Sherrylin;
 using ManosabaLin.Characters.Sherrylin.Cards;
 using ManosabaLin.Characters.Yalisalin;
@@ -91,6 +92,9 @@ public partial class MainFile : Node
             }).PileType;
 
         RitsuLibFramework.EnsureGodotScriptsRegistered(assembly, Logger);
+
+        // 注册「残骸首领战胜奖励」的自定义 reward 类型（读档重建与联机同步都依赖它）。
+        GuardOneRewardRegistrar.Register();
 
         Harmony harmony = new(ModId);
         harmony.PatchAll();

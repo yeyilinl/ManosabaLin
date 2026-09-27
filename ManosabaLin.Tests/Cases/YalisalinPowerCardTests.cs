@@ -5,6 +5,7 @@ using ManosabaLin.Characters.Yalisalin.Powers;
 using ManosabaLin.ManosabaLinCode.Characters.Hiro.Powers;
 using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.Models.Monsters;
+using MegaCrit.Sts2.Core.Models.Powers;
 using TestTheSpire;
 using Xunit;
 
@@ -176,5 +177,49 @@ public sealed class YalisalinPowerCardTests : CombatTestSuite
 
         Assert.Equal(5, CardTestAssertions.PowerAmount<SuspectPower>(Player.Creature));
         Assert.Equal(1, CardTestAssertions.PowerAmount<LymPower>(enemy));
+    }
+
+    /// <summary>
+    ///     魔女之力——需 100 层【魔女化】才可打出，打出后获得 1 层【魔女仪式】、2 层无实体、1 层【劫难】。
+    /// </summary>
+    [Fact]
+    public async Task WitchForce_requires_witchification_and_applies_ritual_intangible_calamity()
+    {
+        await ApplyPower<WithPower>(Player.Creature, 100);
+        await WaitForIdle();
+
+        var card = await AddToHand<YalisalinWitchForce>();
+        await PlayerCmd.SetEnergy(10, Player);
+        await WaitForIdle();
+
+        Assert.True(card.CanPlay());
+
+        await Play(card);
+        await WaitForIdle();
+
+        Assert.Equal(1, CardTestAssertions.PowerAmount<RitualCeremonyPower>(Player.Creature));
+        Assert.Equal(2, CardTestAssertions.PowerAmount<IntangiblePower>(Player.Creature));
+        Assert.Equal(1, CardTestAssertions.PowerAmount<CalamityPower>(Player.Creature));
+    }
+
+    /// <summary>魔女之力——【魔女化】不足 100 层时不可打出。</summary>
+    [Fact]
+    public async Task WitchForce_is_unplayable_below_one_hundred_witchification()
+    {
+        // 先执行一次真实 GameAction，避免整套 harness 判定「本用例没打出任何牌」。
+        var strike = await AddToHand<YalisalinAttack>();
+        await PlayerCmd.SetEnergy(10, Player);
+        await WaitForIdle();
+        await Play(strike, EnemyAt(0));
+        await WaitForIdle();
+
+        await ApplyPower<WithPower>(Player.Creature, 99);
+        await WaitForIdle();
+
+        var card = await AddToHand<YalisalinWitchForce>();
+        await PlayerCmd.SetEnergy(10, Player);
+        await WaitForIdle();
+
+        Assert.False(card.CanPlay());
     }
 }

@@ -1,7 +1,9 @@
 // GuardOneMonster.cs
+using System;
 using ManosabaLin.Characters.Hiro.Cards;
 using ManosabaLin.Characters.Hiro.Events;
 using ManosabaLin.Characters.Hiro.Powers;
+using ManosabaLin.Characters.Hiro.Rewards;
 using ManosabaLin.Extensions;
 using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.Nodes.Audio;
@@ -15,6 +17,7 @@ using MegaCrit.Sts2.Core.Models.Powers;
 using MegaCrit.Sts2.Core.MonsterMoves.Intents;
 using MegaCrit.Sts2.Core.MonsterMoves.MonsterMoveStateMachine;
 using MegaCrit.Sts2.Core.Nodes.Combat;
+using MegaCrit.Sts2.Core.Rooms;
 using MegaCrit.Sts2.Core.Runs;
 using MegaCrit.Sts2.Core.ValueProps;
 using STS2RitsuLib.Audio;
@@ -39,6 +42,9 @@ public sealed class GuardOneMonster : ModMonsterTemplate
     private int FrailAmount => AscensionHelper.GetValueIfAscension(AscensionLevel.DeadlyEnemies, 2, 2);
     private int VulnerableAmount => AscensionHelper.GetValueIfAscension(AscensionLevel.DeadlyEnemies, 2, 2);
     private int PoisonAttackPoisonAmount => 3;
+
+    /// <summary>防止 <see cref="AfterDeath" /> 被重复调用时重复发放战胜奖励。</summary>
+    private bool _bossRewardGranted;
 
     public override MonsterAssetProfile AssetProfile => new(
         VisualsScenePath: "res://ManosabaLin/scenes/monsters/guard_one.tscn"
@@ -224,7 +230,36 @@ public sealed class GuardOneMonster : ModMonsterTemplate
             RunManager.Instance.State?.Acts.ElementAtOrDefault(2)?._rooms.Ancient = ModelDb.AncientEvent<WitchoftheIsland>();
             RunManager.Instance.State?.Acts.ElementAtOrDefault(1)?.SetBossEncounter(ModelDb.Get<GuardTwoBossEncounter>());
             RunManager.Instance.State?.Acts.ElementAtOrDefault(2)?.SetBossEncounter(ModelDb.Get<GuardThreeEncounter>());
+
+            // 「战胜残骸首领」奖励：真正死亡时（wasRemovalPrevented=true 是「死亡被阻止」的那次调用）只发放一次。
+            if (!wasRemovalPrevented && !_bossRewardGranted)
+            {
+                _bossRewardGranted = true;
+                GrantBossVictoryRewards();
+            }
         }
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    ///     给本次战斗的每个玩家追加「从牌组中选择两张牌升级」奖励。
+    ///     通过 <see cref="CombatRoom.AddExtraReward" /> 挂到战斗房间上，会在战斗结束后的奖励屏里
+    ///     以独立条目出现（<see cref="GuardOneBossUpgradeReward.RewardsSetIndex" />=0，排在金币/药水/卡牌之前）。
+    /// </summary>
+    private void GrantBossVictoryRewards()
+    {
+        try
+        {
+            if (RunManager.Instance.State?.CurrentRoom is not CombatRoom room) return;
+
+            foreach (var player in room.CombatState.Players)
+            {
+                room.AddExtraReward(player, new GuardOneBossUpgradeReward(player));
+            }
+        }
+        catch (Exception ex)
+        {
+            MainFile.Logger.Info($"[GuardOneMonster] GrantBossVictoryRewards failed: {ex.Message}");
+        }
     }
 }

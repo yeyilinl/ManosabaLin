@@ -3,12 +3,12 @@
 namespace ManosabaLin.Characters.Yalisalin.Cards;
 
 /// <summary>
-/// 双轨日（2 费能力・罕见）：
-/// 任意原罪触发「自惩」后，可对另一张手牌原罪立刻宽恕。
+/// 双轨日（2 费能力・稀有）：
+/// 任意原罪触发「自惩」后，可对所有牌（抽牌堆 / 手牌 / 弃牌堆）里的一张原罪立刻宽恕。
 /// 升级：费用 -1。
 /// </summary>
 [RegisterCard(typeof(YalisalinCardPool))]
-public sealed class DualTrackDay() : ManosabaCardTemplate(2, CardType.Power, CardRarity.Uncommon, TargetType.Self)
+public sealed class DualTrackDay() : ManosabaCardTemplate(2, CardType.Power, CardRarity.Rare, TargetType.Self)
 {
     protected override IEnumerable<DynamicVar> CanonicalVars =>
     [

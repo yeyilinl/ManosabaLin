@@ -15,6 +15,10 @@ namespace ManosabaLin.Characters.Sherrylin.Cards;
 public sealed class SharedExhaustPlay() : ManosabaCardTemplate(3, CardType.Skill, CardRarity.Rare, TargetType.Self)
 {
     public override CardMultiplayerConstraint MultiplayerConstraint => CardMultiplayerConstraint.MultiplayerOnly;
+
+    /// <summary>每名其他友方被消耗的牌数。</summary>
+    private const int ExhaustPerAlly = 2;
+
     public override IEnumerable<CardKeyword> CanonicalKeywords
     {
         get { yield return CardKeyword.Exhaust; }
@@ -27,11 +31,14 @@ public sealed class SharedExhaustPlay() : ManosabaCardTemplate(3, CardType.Skill
         var exhausted = new List<CardModel>();
         foreach (var ally in AllyPlayers(includeSelf: false))
         {
-            var card = PickCardToExhaust(ally.Creature);
-            if (card == null) continue;
+            for (var i = 0; i < ExhaustPerAlly; i++)
+            {
+                var card = PickCardToExhaust(ally.Creature, exhausted);
+                if (card == null) break;
 
-            exhausted.Add(card);
-            await CardCmd.Exhaust(choiceContext, card);
+                exhausted.Add(card);
+                await CardCmd.Exhaust(choiceContext, card);
+            }
         }
 
         foreach (var player in AllyPlayers(includeSelf: true))
@@ -55,12 +62,13 @@ public sealed class SharedExhaustPlay() : ManosabaCardTemplate(3, CardType.Skill
                 && p.Creature.IsAlive);
     }
 
-    private CardModel? PickCardToExhaust(Creature ally)
+    private CardModel? PickCardToExhaust(Creature ally, IReadOnlyCollection<CardModel> alreadyPicked)
     {
         var cards = PileType.Draw.GetPile(ally.Player).Cards
             .Concat(PileType.Discard.GetPile(ally.Player).Cards)
             .Where(static c => !SamePlaceTruth.IsSelectionLocked(c))
             .Where(c => !c.Keywords.Contains(CardKeyword.Unplayable))
+            .Where(c => !alreadyPicked.Contains(c))
             .ToList();
 
         return cards.Count == 0 ? null : Owner.RunState.Rng.CombatCardSelection.NextItem(cards);

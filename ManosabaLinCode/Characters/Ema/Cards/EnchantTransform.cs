@@ -39,16 +39,18 @@ public sealed class EnchantTransform : ManosabaCardTemplate
             }
         }
 
-        // 2. 如果反驳计数>=3，触发变化效果
-        var rebuttalCount = EmalinCombatHelper.GetRebuttalPlaysThisTurn(
-            owner.Creature, CombatState);
-        if (rebuttalCount < 3) return;
+        // 2. 计数达标才触发变化效果。
+        // 未升级：只数【反驳】附魔；升级后：数任意【审判】附魔（赞同/反驳/疑问合计）。
+        var enchantmentCount = IsUpgraded
+            ? EmalinCombatHelper.GetTotalEnchantmentPlaysThisTurn(owner.Creature, CombatState)
+            : EmalinCombatHelper.GetRebuttalPlaysThisTurn(owner.Creature, CombatState);
+        if (enchantmentCount < 3) return;
 
         // 选择一张手卡，读取其附魔类型
         var keywordHand = PileType.Hand.GetPile(owner).Cards.ToList();
         if (keywordHand.Count == 0) return;
 
-        var keywordPrefs = new CardSelectorPrefs(SelectionScreenPrompt, 1, 1);
+        var keywordPrefs = new CardSelectorPrefs(SelectionScreenPrompt, 0, 1);
         var keywordSelected = await CardSelectCmd.FromHand(
             choiceContext, owner, keywordPrefs,
             c => c.Enchantment is Rebuttal or Agreement or Doubt, this);
@@ -109,6 +111,6 @@ public sealed class EnchantTransform : ManosabaCardTemplate
     }
     protected override void OnUpgrade(ComponentContext componentContext)
     {
-        EnergyCost.UpgradeBy(-1);
+        
     }
 }

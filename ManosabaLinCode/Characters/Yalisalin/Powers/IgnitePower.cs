@@ -7,7 +7,7 @@ namespace ManosabaLin.Characters.Yalisalin.Powers;
 /// 点火（亚里沙的专属魔法卡能力）：
 /// 回合开始或回合结束时，按当前层数 N 随机攻击 N 次：
 /// 每次随机选择全场目标（敌我均可），对其造成等于当前层数的伤害。
-/// 命中敌方：随机友方获得 1 点格挡；若该敌方没有易伤，给予 1 层易伤。
+/// 命中敌方：所有友方获得 1 点格挡；若该敌方没有易伤，给予 1 层易伤。
 /// 命中友方：改为造成 1 点伤害，然后本能力 +2 层。
 /// </summary>
 [RegisterPower]
@@ -64,11 +64,10 @@ public sealed class IgnitePower : ManosabaPowerTemplate
 
             if (isEnemy)
             {
-                // 随机友方获得 1 点格挡
-                if (allies.Length > 0)
+                // 所有友方获得 1 点格挡（卡面文案为「所有友方」，不是随机一名）
+                foreach (var ally in allies)
                 {
-                    var ally = rng.NextItem(allies);
-                    if (ally != null)
+                    if (ally.IsAlive)
                         await CreatureCmd.GainBlock(ally, 1m, ValueProp.Move, null);
                 }
 

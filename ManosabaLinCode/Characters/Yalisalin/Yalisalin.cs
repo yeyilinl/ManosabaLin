@@ -17,8 +17,8 @@ public class Yalisalin : ManosabaCharacterTemplate<YalisalinCardPool, YalisalinR
     public static readonly Color Color = new("ff0000");
 
     public override Color NameColor => Color;
-    public override Color EnergyLabelOutlineColor => new(0.67f, 0.4f, 0.8f);
-    public override Color MapDrawingColor => new(0.67f, 0.4f, 0.8f);
+    public override Color EnergyLabelOutlineColor => new(1f, 0f, 0f);
+    public override Color MapDrawingColor => new(1f, 0f, 0f);
     public override CharacterGender Gender => CharacterGender.Feminine;
     public override int StartingHp => 75;
     public override int StartingGold => 99;

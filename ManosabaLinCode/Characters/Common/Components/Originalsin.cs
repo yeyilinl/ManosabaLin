@@ -94,6 +94,13 @@ public sealed partial class Originalsin : KeywordLikeComponent
         }
     }
 
+    /// <summary>
+    ///     本回合是否在回合结束时保留了自己。只有真的执行过保留的那一侧才为 true，
+    ///     用于 <see cref="AfterSideTurnEndPostfix" /> 判定「这张牌是被保留下来的」，
+    ///     避免把「回合结束阶段才被塞进手牌」的牌误判成保留。
+    /// </summary>
+    private bool _retainedForTurnEnd;
+
     public override Task BeforeSideTurnEndPostfix(
         PlayerChoiceContext choiceContext,
         CombatSide side,
@@ -103,16 +110,35 @@ public sealed partial class Originalsin : KeywordLikeComponent
         if (Card?.Owner?.Creature is { } creature && side == creature.Side)
         {
             Card.GiveSingleTurnRetain();
+            _retainedForTurnEnd = true;
         }
         return Task.CompletedTask;
     }
 
-    public override async Task AfterPlayerTurnStartEarlyPostfix(
+    /// <summary>
+    ///     回合结束「自动保留」后<b>立刻</b>触发「宽恕」。
+    ///     <para>
+    ///         引擎的回合结束顺序是：<c>BeforeSideTurnEnd</c>（本组件在这里保留）→ 手牌里的回合结束牌效果
+    ///         → <c>BeforeFlush</c> → 清手牌 → <c>AfterSideTurnEnd</c>。
+    ///         放在 <c>AfterSideTurnEnd</c> 才能保证两点：① 被保留的牌此刻仍在手牌里；
+    ///         ② 宽恕效果新加入手牌的牌不会被同一回合的清手牌冲掉（例如 Cocoworry 的「互换」）。
+    ///     </para>
+    ///     <para>
+    ///         ⚠️ 旧实现挂在 <c>AfterPlayerTurnStartEarlyPostfix</c>（下回合开始才宽恕），
+    ///         已删除 —— 否则会和这里一起构成「一回合宽恕两次」。
+    ///     </para>
+    /// </summary>
+    public override async Task AfterSideTurnEndPostfix(
         PlayerChoiceContext choiceContext,
-        Player player,
+        CombatSide side,
+        IEnumerable<Creature> participants,
         ComponentContext componentContext)
     {
-        if (Card?.Owner != player) return;
+        if (!_retainedForTurnEnd) return;
+        _retainedForTurnEnd = false;
+
+        if (Card?.Owner?.Creature is not { } creature) return;
+        if (side != creature.Side) return;
         if (Card.Pile?.Type != PileType.Hand) return;
 
         await Forgive(choiceContext);
@@ -868,15 +894,13 @@ public sealed partial class Originalsin : KeywordLikeComponent
         var owner = card.Owner!;
         var me = owner.Creature;
 
-        // 宽恕的代价：下回合开始时失去 10 魔女化（clamp 到当前层数，不扣成负数）
-        var currentWith = me.GetPower<WithPower>()?.Amount ?? 0m;
-        if (currentWith > 0m)
-        {
-            var loss = Math.Min(10m, currentWith);
-            await PowerCmd.Apply<WithPower>(choiceContext, me, -loss, me, card, false);
-        }
+        // 宽恕的代价是「<b>下回合开始时</b>失去 10 魔女化」——卡面写死了这个时点，
+        // 所以这里<b>不立刻扣</b>，只登记一次延迟效果（多次宽恕会叠加层数），
+        // 真正的扣减由 OriginalsinWitchificationLossPower 在自己回合开始时执行。
+        await PowerCmd.Apply<OriginalsinWitchificationLossPower>(
+            choiceContext, me, 10m, me, card);
 
-        // 宽恕的成长：此卡下次打出获得的魔女化 +10
+        // 宽恕的成长：此卡下次打出获得的魔女化 +10（这个是当场生效的数值增长）
         if (card.DynamicVars.TryGetValue("WitchAmount", out var witchAmount))
             witchAmount.BaseValue += 10m;
     }

@@ -4,6 +4,7 @@ using ManosabaLin.Characters.Ananlin.Cards;
 using ManosabaLin.Characters.Ema.Cards;
 using ManosabaLin.Characters.Hiro.Cards;
 using ManosabaLin.Characters.Sherrylin.Cards;
+using ManosabaLin.Characters.Yalisalin.Cards;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.UI;
 using MegaCrit.Sts2.Core.Nodes.Cards;
@@ -90,7 +91,20 @@ internal static class LyXlTypePlaquePatch
 
     private static bool ShouldRemoveTypePlaque(NCard card)
     {
-        return GodotObject.IsInstanceValid(card) && card.Model is
+        return GodotObject.IsInstanceValid(card) && card.Model is { } model && RemovesTypePlaque(model);
+    }
+
+    /// <summary>
+    ///     「卡面不显示类型牌匾（攻击 / 技能 / 能力）」的卡牌白名单。
+    ///     注意：<b>这不是靠 <see cref="CardRarity.Ancient" /> 自动做到的</b>
+    ///     —— ancient 布局照样有类型牌匾，必须在这里列名才会被移除。
+    ///     凡是「卡面只留风味文本」（<c>AncientTextBgPath</c> 指向全透明的
+    ///     <c>ancient_empty_text_bg.png</c>）的卡，都应当加进来；
+    ///     <c>TypePlaqueRemovalTests</c> 会扫全卡池守住这条不变式。
+    /// </summary>
+    internal static bool RemovesTypePlaque(CardModel model)
+    {
+        return model is
             LyXl or
             HiroBadEnding or
             AnanlinFinishedDraft or
@@ -114,7 +128,10 @@ internal static class LyXlTypePlaquePatch
             Justice or
             TheFool or
             SamePlaceTruth or
-            SamePlacePendingTruth;
+            SamePlacePendingTruth or
+            ExtinguishFlame or
+            LinkTheFire or
+            UsurpTheFlame;
     }
 
     private static bool ShouldHideAncientTextBg(NCard card)

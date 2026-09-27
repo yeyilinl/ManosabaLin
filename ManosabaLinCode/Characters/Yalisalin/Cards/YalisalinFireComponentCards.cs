@@ -137,6 +137,9 @@ public sealed class Brokentrust()
 public sealed class Holdmypain()
     : ManosabaCardTemplate(1, CardType.Power, CardRarity.Common, TargetType.Self)
 {
+    // 余火材薪：只提供悬浮提示，不在卡面显示。
+    protected override IEnumerable<ICardComponent> CanonicalComponents => [new YalisalinFirewood()];
+
     protected override Task OnPlay(PlayerChoiceContext choiceContext, CardPlay cardPlay, ComponentContext componentContext)
     {
         if (YalisalinFireColorSystem.TryGetHairpin(Owner, out var hairpin))
@@ -182,6 +185,9 @@ public sealed class Burnedapology()
 public sealed class Unneededgoodchild()
     : ManosabaCardTemplate(2, CardType.Skill, CardRarity.Uncommon, TargetType.Self)
 {
+    // 余火材薪：只提供悬浮提示，不在卡面显示。
+    protected override IEnumerable<ICardComponent> CanonicalComponents => [new YalisalinFirewood()];
+
     protected override IEnumerable<DynamicVar> CanonicalVars => [new EnergyVar(2)];
 
     protected override Task OnPlay(PlayerChoiceContext choiceContext, CardPlay cardPlay, ComponentContext componentContext)
@@ -440,6 +446,9 @@ public sealed class Fifthselfproof()
     : ManosabaCardTemplate(3, CardType.Attack, CardRarity.Rare, TargetType.AnyEnemy),
         IYalisalinFireComponentModifier
 {
+    // 余火材薪：只提供悬浮提示，不在卡面显示。
+    protected override IEnumerable<ICardComponent> CanonicalComponents => [new YalisalinFirewood()];
+
     [SavedProperty] public int ManualFireUseProgress { get; private set; }
     [SavedProperty] public int FireUseCount { get; set; }
 

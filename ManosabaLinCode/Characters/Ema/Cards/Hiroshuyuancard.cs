@@ -15,7 +15,7 @@ namespace ManosabaLin.Characters.Ema.Cards;
 [RegisterCard(typeof(EmalinCardPool))]
 public sealed class Hiroshuyuancard : ManosabaCardTemplate
 {
-    public Hiroshuyuancard() : base(2, CardType.Power, CardRarity.Uncommon, TargetType.Self) { }
+    public Hiroshuyuancard() : base(1, CardType.Power, CardRarity.Uncommon, TargetType.Self) { }
 
     protected override IEnumerable<IHoverTip> AdditionalHoverTips
     {

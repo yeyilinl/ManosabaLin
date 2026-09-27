@@ -117,8 +117,9 @@ public sealed class Lyshuyuan : ManosabaCardTemplate
             .Concat(discardPile.Cards)
             .ToList();
         
-        // 1. 按疏远值选择这些牌中的卡变形成随机疏远卡并升级（仅当疏远 > 亲和时）
-        if (estrangement > affinity)
+        // 1. 按疏远值选择这些牌中的卡变形成随机疏远卡并升级（仅当疏远 > 亲和时；
+        //    花朵绽放：被监听的队友打出的【疏远】牌必定触发该额外效果）
+        if (estrangement > affinity || FlowerBloomTracker.IsWatched(creature))
         {
             var selectCount = Math.Min(estrangement, allNonDeckCards.Count);
             if (selectCount > 0)
