@@ -24,7 +24,7 @@
 | **A 余火组件缺陷**  | A1 | 余火打出的手牌会**卡模型**                                                                                                                  | ✅ 已定位（**双重入堆**）     | `YalisalinFireComponentResolver.PlayCardWithSuppressedFireComponent` |
 |               | A2 | 就算选的**零费也会扣费**                                                                                                                   | ⚠️ 已缩小到 **3 个候选根因** | 同上 + `YalisalinFireComponentContext` 的"费用两套账"                        |
 |               | A3 | 「把道歉烧成灰」自动打出**应当直接免费**，现在真扣费                                                                                                     | ✅ 根因明确              | `TryAutoPlayBurnedCard` → `card.SpendResources()`                    |
-| **B 残骸 BOSS** | B1 | 一阶段上毒意图改为**判定**：玩家已有毒 → 1 层虚弱；没毒 → 照常上毒                                                                                          | ✅ 需求明确，待改           | `GuardOneMonster.PoisonMove`（第 117 行）                                |
+| **B 残骸 BOSS** | B1 | 一阶段上毒意图改为**判定**：玩家已有毒 → 1 层虚弱；没毒 → 照常上毒                                                                                          | ✅ **已实现并测试通过**       | `GuardOneMonster.PoisonMove`（第 127 行，见 §二）                            |
 | **C 火色机制改版**  | C1 | 六格量表 + **格位定色**（1-2 浅橙 / 3-4 亮黄 / 5-6 赤红）                                                                                        | ✅ 已定稿               | §三                                                                   |
 |               | C2 | **消耗方向反转**：从**最新格**开始（代码现在是反的）                                                                                                   | ✅ 已定稿，**要改代码**      | `YalisalinFireColorGauge.Consume`（第 1483 行）                          |
 |               | C3 | **同色**两段连续才有额外收益                                                                                                                 | ✅ 已定稿               | §三                                                                   |
@@ -275,6 +275,69 @@ TryAutoPlayBurnedCard (Resolver:288)
 | 2  | 给 `PlayCardWithSuppressedFireComponent` 加 `free` 开关；免费时**不调** `SpendResources` |
 | 3  | 把 `context` 的费用偏移改成"直接改真实费用"，`GetEffectiveCost` 退化为读 `EnergyCost`              |
 | 4  | 统一 `skipCardPileVisuals` / `SkipBurnVisuals` 的取值，避免半张牌残留                       |
+
+## 二、残骸 BOSS 上毒意图改为判定（B 类）
+
+### 2.1 需求（用户原话）
+
+> 残骸BOSS一阶段上毒的意图改成判定若玩家有毒就给1层虚弱buff，若没有就正常上毒
+
+### 2.2 现状（改之前）
+
+`ManosabaLinCode/Characters/Hiro/Monsters/GuardOneMonster.cs`：
+
+- 第 66 行：`var poison = new MoveState("POISON_MOVE", PoisonMove, new DebuffIntent());`
+  —— 阶段一行动环写死为 `ATTACK_MOVE → POISON_MOVE → DEBUFF_SHIELD_MOVE → MARK_MOVE → ATTACK_MOVE`。
+- `PoisonMove`：对每个目标 `PowerCmd.Apply<PoisonPower>(…, PoisonAmount, …)`（`PoisonAmount` = 6，进阶不放大），
+  随后给自己叠 `WithPower(WithAmount)`（30 / 进阶 50）。
+
+⇒ 问题：玩家已经有中毒时继续叠毒，边际收益低、也缺少压迫感。
+
+### 2.3 改法（✅ **已实现**）
+
+逐目标二选一：
+
+```csharp
+foreach (var target in targets)
+{
+    if (target.GetPower<PoisonPower>() is { Amount: > 0 })
+        await PowerCmd.Apply<WeakPower>(new ThrowingPlayerChoiceContext(), target, WeakAmount, Creature, null);
+    else
+        await PowerCmd.Apply<PoisonPower>(new ThrowingPlayerChoiceContext(), target, PoisonAmount, Creature, null);
+}
+```
+
+| 判定 | 结果 |
+| --- | --- |
+| 目标 `PoisonPower.Amount > 0` | 给 **1 层虚弱**（`WeakPower`，`PowerType.Debuff` / `StackType.Counter`），**不再叠毒**，也不清掉原有中毒 |
+| 目标没有中毒 | 照常上 `PoisonAmount` 层中毒（6 层） |
+
+- `WeakAmount`（第 48 行）固定 **1**，不随进阶变化 —— 进阶只抬高伤害/格挡，这条是"判定改给"的补偿效果。
+  写成属性是为了日后好调。
+- 自己叠 `WithPower(30/50)` 那一段**不变**（判定只影响给玩家的减益）。
+- ✅ **意图图标保持 `DebuffIntent`**：中毒与虚弱都是减益（`PowerType.Debuff`），静态图标本来就正确，
+  不需要为"这次到底会给哪个"做动态图标。
+
+### 2.4 测试（✅ 已通过）
+
+`ManosabaLin.Tests/Cases/GuardOnePoisonIntentTests.cs`（新建，2 条）：
+
+| 用例 | 断言 |
+| --- | --- |
+| `Poison_move_grants_weak_when_player_already_poisoned` | 预置中毒后走到上毒意图 ⇒ `WeakPower.Amount == 1`，且 `PoisonPower.Amount > 0`（原有中毒没被清） |
+| `Poison_move_applies_poison_when_player_has_none` | 无毒 ⇒ `PoisonPower.Amount ∈ [5, 6]`，且 `WeakPower == null` |
+
+两条顺手确认的 harness 事实（已写进测试注释）：
+
+- 行动顺序由状态机写死 `ATTACK_MOVE → POISON_MOVE` ⇒ **结束两个玩家回合**必然走到上毒意图，不需要随机控制。
+- ⚠️ 中毒**每经过一个玩家回合衰减 1 点**，所以怪物刚上 6 层时读到的是 **5**（断言要留这个衰减量）。
+
+### 2.5 仍未裁
+
+| # | 问题 | 现状 |
+| --- | --- | --- |
+| 1 | 虚弱层数是否随进阶提升 | 当前固定 1（按用户原话）。要改只动 `WeakAmount` |
+| 2 | 意图图标是否要动态显示"毒 or 虚弱" | 当前不做（静态 `DebuffIntent`） |
 
 ## 三、火色 v2 机制改版（C 类）
 

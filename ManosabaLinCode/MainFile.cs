@@ -2,6 +2,7 @@ using HarmonyLib;
 using ManosabaLin.Characters.Ananlin;
 using ManosabaLin.Characters.Ananlin.Cards;
 using ManosabaLin.Characters.Common.AncientCurses;
+using ManosabaLin.Characters.Common.LinRelics;
 using ManosabaLin.Characters.Ema.Cards;
 using ManosabaLin.Characters.Emalin;
 using ManosabaLin.Characters.Hiro;
@@ -11,6 +12,7 @@ using ManosabaLin.Characters.Sherrylin;
 using ManosabaLin.Characters.Sherrylin.Cards;
 using ManosabaLin.Characters.Yalisalin;
 using ManosabaLin.Characters.Yalisalin.Components;
+using ManosabaLin.Compat.Hextech;
 using ManosabaLin.MainMenu;
 using ManosabaLin.Utils;
 using MegaCrit.Sts2.Core.Helpers;
@@ -95,6 +97,14 @@ public partial class MainFile : Node
 
         // 注册「残骸首领战胜奖励」的自定义 reward 类型（读档重建与联机同步都依赖它）。
         GuardOneRewardRegistrar.Register();
+
+        // 联动遗物 2：「脱离球位、挂到血条下方」的持续型情绪球要作为战斗钩子监听者被枚举
+        // （ModHelper.SubscribeForCombatStateHooks）⇒ 球离开球位后效果照旧、不需要任何能力。
+        HangingEmotionOrbs.Register();
+
+        // 海克斯符文联动（软依赖、零 patch）：装了 HextechRunes 就把这 6 个遗物作为「海克斯符文」登记过去。
+        // ⚠️ 必须在模组初始化阶段调用（要赶在共享遗物池首次枚举之前）；对方没装时这里是空操作。
+        HextechCompat.Initialize();
 
         Harmony harmony = new(ModId);
         harmony.PatchAll();

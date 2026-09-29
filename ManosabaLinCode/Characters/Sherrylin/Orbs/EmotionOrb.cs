@@ -1,5 +1,6 @@
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Helpers;
+using MegaCrit.Sts2.Core.HoverTips;
 using MegaCrit.Sts2.Core.Nodes.Cards;
 using MegaCrit.Sts2.Core.Nodes.Orbs;
 using STS2RitsuLib.Scaffolding.Godot;
@@ -17,6 +18,12 @@ public abstract class EmotionOrb<T> : ModOrbTemplate, IEmotionOrb where T : Card
     public override Color DarkenedColor => OrbColor;
 
     protected abstract Color OrbColor { get; }
+
+    /// <summary>
+    /// 球体画面上渲染的就是那张情绪卡（见 <see cref="EmotionOrbVisualPatch" />），
+    /// 因此鼠标碰上去时把那张卡本身的预览一并挂出来 —— 挂在血条下方的球一样能看效果。
+    /// </summary>
+    protected override IEnumerable<IHoverTip> AdditionalHoverTips => [HoverTipFactory.FromCard<T>()];
 
     public override OrbAssetProfile AssetProfile => new(
         IconPath: "res://images/events/crystal_sphere/crystal_sphere_rare_card_reward.png",

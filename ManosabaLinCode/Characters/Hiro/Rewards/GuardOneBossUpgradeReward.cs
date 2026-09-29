@@ -18,9 +18,23 @@ namespace ManosabaLin.Characters.Hiro.Rewards;
 ///     从自己的牌组中选择可升级的卡牌进行升级。
 /// </summary>
 /// <remarks>
-///     同步说明：奖励集合里「选了哪一条」由原版 <c>RewardsSetSynchronizer</c> 同步；
-///     本奖励自身的副作用（选卡 + 升级）走 <see cref="CardSelectCmd.FromDeckForUpgrade" />，
-///     它内部用 <c>PlayerChoiceSynchronizer</c> 同步玩家选择，因此在联机下是确定性的。
+///     <para>
+///         ⚠️ <b>已停用（2026-09-27）</b>：残骸首领的升级奖励已改由
+///         <see cref="GuardOneBossUpgradeHook" />（<c>BeforeCombatRewardOffered</c> 跑局单例）发放，
+///         升级界面会在奖励屏出现<b>之前</b>自动弹出，不再是奖励列表里的一条自定义奖励。
+///         <b>不要再调用 <c>CombatRoom.AddExtraReward</c> 挂这个奖励</b>，否则会与钩子重复发放。
+///     </para>
+///     <para>
+///         之所以保留这个类与 <see cref="GuardOneRewardRegistrar" /> 的注册（而不是直接删掉）：
+///         自定义奖励 id 与 <c>RewardType</c> 一旦从注册表里消失，
+///         旧存档在读档重建奖励时（<c>Reward.FromSerializable</c> → 按前缀查 <c>RewardType</c>）会解析失败。
+///         保留注册的成本只是一条表项，所以选择保留。
+///     </para>
+///     <para>
+///         同步说明：奖励集合里「选了哪一条」由原版 <c>RewardsSetSynchronizer</c> 同步；
+///         本奖励自身的副作用（选卡 + 升级）走 <see cref="CardSelectCmd.FromDeckForUpgrade" />，
+///         它内部用 <c>PlayerChoiceSynchronizer</c> 同步玩家选择，因此在联机下是确定性的。
+///     </para>
 /// </remarks>
 public sealed class GuardOneBossUpgradeReward(Player player) : ModCustomReward(player)
 {

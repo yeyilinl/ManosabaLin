@@ -1,4 +1,5 @@
 ﻿using ManosabaLin.Characters.Common;
+using ManosabaLin.Characters.Common.LinRelics;
 using ManosabaLin.Characters.Sherrylin.Orbs;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Creatures;
@@ -51,7 +52,10 @@ public class Loseengry : ManosabaPowerTemplate
     {
         int maxEnergy = Owner.Player.PlayerCombatState.MaxEnergy;
         var orbs = Owner.Player.PlayerCombatState.OrbQueue.Orbs;
-        bool hasOrb = orbs.Any(o => o is EmotionElationOrb);
+        // ⚠️ 雀跃球被联动遗物 2「摘下球位、挂到血条下方」后就不在 OrbQueue 里了，
+        // 但它仍然存在、仍然生效 ⇒ 这里必须把「挂着的雀跃球」也算上。
+        bool hasOrb = orbs.Any(o => o is EmotionElationOrb)
+                      || HangingEmotionOrbs.HasHanging(Owner.Player, o => o is EmotionElationOrb);
 
         await PowerCmd.Remove(this);
 

@@ -1,9 +1,7 @@
 // GuardOneMonster.cs
-using System;
 using ManosabaLin.Characters.Hiro.Cards;
 using ManosabaLin.Characters.Hiro.Events;
 using ManosabaLin.Characters.Hiro.Powers;
-using ManosabaLin.Characters.Hiro.Rewards;
 using ManosabaLin.Extensions;
 using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.Nodes.Audio;
@@ -43,8 +41,11 @@ public sealed class GuardOneMonster : ModMonsterTemplate
     private int VulnerableAmount => AscensionHelper.GetValueIfAscension(AscensionLevel.DeadlyEnemies, 2, 2);
     private int PoisonAttackPoisonAmount => 3;
 
-    /// <summary>防止 <see cref="AfterDeath" /> 被重复调用时重复发放战胜奖励。</summary>
-    private bool _bossRewardGranted;
+    /// <summary>
+    ///     「上毒」意图在目标已有中毒时改给的虚弱层数。
+    ///     ⚠️ 当前固定 1 层、不随进阶变化（进阶只抬高伤害/格挡，这条是判定改给的补偿效果）。
+    /// </summary>
+    private int WeakAmount => 1;
 
     public override MonsterAssetProfile AssetProfile => new(
         VisualsScenePath: "res://ManosabaLin/scenes/monsters/guard_one.tscn"
@@ -114,14 +115,31 @@ public sealed class GuardOneMonster : ModMonsterTemplate
             .Execute(null);
     }
 
+    /// <summary>
+    ///     阶段一的「上毒」意图。带二选一判定：
+    ///     目标<b>已经有中毒</b> ⇒ 改为给 1 层虚弱（继续叠毒收益太低，改成削弱玩家输出）；
+    ///     目标<b>没有中毒</b> ⇒ 照常上毒。
+    /// </summary>
+    /// <remarks>
+    ///     意图图标保持 <see cref="DebuffIntent" />：中毒与虚弱都是减益，图标本来就对，
+    ///     不需要为了「这次到底会给哪个」做动态图标。
+    /// </remarks>
     private async Task PoisonMove(IReadOnlyList<Creature> targets)
     {
         await CreatureCmd.TriggerAnim(Creature, "Cast", 0.5f);
 
         foreach (var target in targets)
         {
-            await PowerCmd.Apply<PoisonPower>(
-                new ThrowingPlayerChoiceContext(), target, PoisonAmount, Creature, null);
+            if (target.GetPower<PoisonPower>() is { Amount: > 0 })
+            {
+                await PowerCmd.Apply<WeakPower>(
+                    new ThrowingPlayerChoiceContext(), target, WeakAmount, Creature, null);
+            }
+            else
+            {
+                await PowerCmd.Apply<PoisonPower>(
+                    new ThrowingPlayerChoiceContext(), target, PoisonAmount, Creature, null);
+            }
         }
 
         await PowerCmd.Apply<WithPower>(
@@ -231,35 +249,11 @@ public sealed class GuardOneMonster : ModMonsterTemplate
             RunManager.Instance.State?.Acts.ElementAtOrDefault(1)?.SetBossEncounter(ModelDb.Get<GuardTwoBossEncounter>());
             RunManager.Instance.State?.Acts.ElementAtOrDefault(2)?.SetBossEncounter(ModelDb.Get<GuardThreeEncounter>());
 
-            // 「战胜残骸首领」奖励：真正死亡时（wasRemovalPrevented=true 是「死亡被阻止」的那次调用）只发放一次。
-            if (!wasRemovalPrevented && !_bossRewardGranted)
-            {
-                _bossRewardGranted = true;
-                GrantBossVictoryRewards();
-            }
+            // 「战胜残骸首领」的卡牌升级奖励**不在这里发**：
+            // 它改由 GuardOneBossUpgradeHook（BeforeCombatRewardOffered 跑局单例）统一处理，
+            // 好处是升级界面在奖励屏出现之前就弹，而不是奖励列表里的一条自定义奖励。
+            // ⚠️ 这里不要再调用 CombatRoom.AddExtraReward，否则会与钩子重复发放。
         }
         return Task.CompletedTask;
-    }
-
-    /// <summary>
-    ///     给本次战斗的每个玩家追加「从牌组中选择两张牌升级」奖励。
-    ///     通过 <see cref="CombatRoom.AddExtraReward" /> 挂到战斗房间上，会在战斗结束后的奖励屏里
-    ///     以独立条目出现（<see cref="GuardOneBossUpgradeReward.RewardsSetIndex" />=0，排在金币/药水/卡牌之前）。
-    /// </summary>
-    private void GrantBossVictoryRewards()
-    {
-        try
-        {
-            if (RunManager.Instance.State?.CurrentRoom is not CombatRoom room) return;
-
-            foreach (var player in room.CombatState.Players)
-            {
-                room.AddExtraReward(player, new GuardOneBossUpgradeReward(player));
-            }
-        }
-        catch (Exception ex)
-        {
-            MainFile.Logger.Info($"[GuardOneMonster] GrantBossVictoryRewards failed: {ex.Message}");
-        }
     }
 }
