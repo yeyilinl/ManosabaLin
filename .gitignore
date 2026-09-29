@@ -410,3 +410,30 @@ FodyWeavers.xsd
 ManosabaLin.pck
 local.props
 AGENTS.local.md
+
+# AI 工作笔记与工具本地状态（仅本地保留，不入库）
+.workbuddy/
+.tmp_minionlib/
+.claude/
+.agents/
+
+# 开发中间产物：本地化翻译映射表 / 生成脚本 / 检查输出（仅本地保留，不入库）
+/batch_*.txt
+/card_nums_check.txt
+/cards_sample.txt
+/cards_todo_*.txt
+/fix_map_newlines.py
+/gen_*.py
+/jpn_powers_*.txt
+/map_*.json
+/remaining_*.txt
+/scan_result*.txt
+/translation_*.txt
+/uniq_*.txt
+/zhs_unique_texts.txt
+
+# 测试工程的构建/部署产物
+ManosabaLin.Tests/mod/
+ManosabaLin.Tests/mod-deps/
+ManosabaLin.Tests/bin/
+ManosabaLin.Tests/obj/
