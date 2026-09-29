@@ -1,0 +1,6 @@
+tree d170b12b06b68da19298fe858c88ab507d3a1699
+parent 51b8a38ef35dd5bf4458f0e34d40a67e5ab6738c
+author FuYnAloft <207443530+fuynaloft@users.noreply.github.com> 1779264578 +0800
+committer FuYnAloft <207443530+fuynaloft@users.noreply.github.com> 1779264578 +0800
+
+fix: 添加 GenerateComponent 的白色发光
