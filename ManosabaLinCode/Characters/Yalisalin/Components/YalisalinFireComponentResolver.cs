@@ -143,7 +143,9 @@ public static class YalisalinFireComponentResolver
                 if (context.BurnedCard != null)
                     await TryAutoPlayBurnedCard(choiceContext, context);
 
-                await Burn(choiceContext, context);
+                // 「烧掉后」效果只在真的烧掉时触发：被烧牌若已离开战斗（例如自动打出的能力牌），不算烧牌。
+                if (!await Burn(choiceContext, context))
+                    continue;
 
                 foreach (var modifier in modifiers)
                     await modifier.AfterFireComponentBurned(choiceContext, context);
@@ -166,7 +168,8 @@ public static class YalisalinFireComponentResolver
                 foreach (var modifier in modifiers)
                     await modifier.BeforeFireComponentBurned(choiceContext, context);
 
-                await Burn(choiceContext, context);
+                if (!await Burn(choiceContext, context))
+                    continue;
 
                 foreach (var modifier in modifiers)
                     await modifier.AfterFireComponentBurned(choiceContext, context);
@@ -292,11 +295,12 @@ public static class YalisalinFireComponentResolver
         if (context.CustomData.GetValueOrDefault("AutoPlayBurnedCard") is not true)
             return;
 
+        // 「把道歉烧成灰」的自动打出不消耗能量，因此只看非资源类的可打出条件。
         if (context.BurnedCard is not { } burned
-            || !CanPlayFromFireComponent(context, burned, ResolveTarget(burned, context.Target)))
+            || !CanPlayFromFireComponent(context, burned, ResolveTarget(burned, context.Target), ignoreResources: true))
             return;
 
-        await PlayCardWithSuppressedFireComponent(choiceContext, context, burned);
+        await PlayCardWithSuppressedFireComponent(choiceContext, context, burned, free: true);
     }
 
     private static async Task PlayChosenCardIfPossible(
@@ -318,7 +322,8 @@ public static class YalisalinFireComponentResolver
         YalisalinFireComponentContext context,
         CardModel card,
         Creature? target,
-        bool includePendingChoiceEffects = false)
+        bool includePendingChoiceEffects = false,
+        bool ignoreResources = false)
     {
         if (card.HasBeenRemovedFromState)
             return false;
@@ -341,6 +346,9 @@ public static class YalisalinFireComponentResolver
             if (nonResourceReasons != UnplayableReason.None)
                 return false;
         }
+
+        if (ignoreResources)
+            return true;
 
         return HasEnoughResourcesForFireComponent(
             context,
@@ -386,40 +394,72 @@ public static class YalisalinFireComponentResolver
             : 0;
     }
 
+    /// <summary>
+    ///     在余火语境下打出一张牌（余火组件本身被抑制，避免嵌套再触发）。
+    ///
+    ///     搬到 Play 堆交给原版 <see cref="CardModel.OnPlayWrapper" /> 的自动打出分支完成，并且不跳过视觉：
+    ///     手动以 skipVisuals 从手牌移走时，原版不会搬运手牌里的 NCard 节点，牌面会残留在手牌区。
+    ///     <paramref name="free" /> 为真时按原版 <see cref="CardCmd.AutoPlay" /> 的口径结算：不扣能量/星星，
+    ///     X 费取当前能量。
+    /// </summary>
     private static async Task PlayCardWithSuppressedFireComponent(
         PlayerChoiceContext choiceContext,
         YalisalinFireComponentContext context,
-        CardModel card)
+        CardModel card,
+        bool free = false)
     {
         var target = ResolveTarget(card, context.Target);
         var combatState = card.CombatState ?? card.Owner.Creature.CombatState;
         if (combatState == null)
             return;
 
-        if (!CanPlayFromFireComponent(context, card, target))
+        if (!CanPlayFromFireComponent(context, card, target, ignoreResources: free))
             return;
 
-        context.ApplyTemporaryCostOffset(card);
-        if (!CanPlayFromFireComponent(context, card, target))
-            return;
+        ResourceInfo resources;
+        if (free)
+        {
+            if (card.EnergyCost.CostsX)
+                card.EnergyCost.CapturedXValue = card.Owner.PlayerCombatState?.Energy ?? 0;
+            card.LastStarsSpent = card.HasStarCostX
+                ? card.Owner.PlayerCombatState?.Stars ?? 0
+                : Math.Max(0, card.GetStarCostWithModifiers());
 
-        await MoveCardToPlayPileForFireComponent(card);
+            resources = new ResourceInfo
+            {
+                EnergySpent = 0,
+                EnergyValue = card.EnergyCost.GetAmountToSpend(),
+                StarsSpent = 0,
+                StarValue = Math.Max(0, card.GetStarCostWithModifiers())
+            };
+        }
+        else
+        {
+            context.ApplyTemporaryCostOffset(card);
+            if (!CanPlayFromFireComponent(context, card, target))
+                return;
+
+            var (energySpent, starsSpent) = await card.SpendResources();
+            resources = new ResourceInfo
+            {
+                EnergySpent = energySpent,
+                EnergyValue = energySpent,
+                StarsSpent = starsSpent,
+                StarValue = starsSpent
+            };
+        }
+
         if (card.CombatState == null)
             return;
 
-        var (energySpent, starsSpent) = await card.SpendResources();
-        var resources = new ResourceInfo
-        {
-            EnergySpent = energySpent,
-            EnergyValue = energySpent,
-            StarsSpent = starsSpent,
-            StarValue = starsSpent
-        };
+        // 余火额外连接的随机牌是刚生成、还不在任何牌堆里的牌；与原版 AutoPlay 一样先放进 Play 堆。
+        if (card.Pile == null)
+            await CardPileCmd.Add(card, PileType.Play);
 
         SuppressedCards.Add(card);
         try
         {
-            await card.OnPlayWrapper(choiceContext, target, isAutoPlay: true, resources, skipCardPileVisuals: true);
+            await card.OnPlayWrapper(choiceContext, target, isAutoPlay: true, resources);
         }
         finally
         {
@@ -427,33 +467,26 @@ public static class YalisalinFireComponentResolver
         }
     }
 
-    private static async Task MoveCardToPlayPileForFireComponent(CardModel card)
-    {
-        if (card.Pile?.Type == PileType.Play)
-            return;
-
-        await CardPileCmd.Add(card, PileType.Play, skipVisuals: true);
-    }
-
-    private static async Task Burn(
+    /// <returns>这张牌是否真的被烧掉了。</returns>
+    private static async Task<bool> Burn(
         PlayerChoiceContext choiceContext,
         YalisalinFireComponentContext context)
     {
         if (context.BurnedCard is not { } burned || burned.HasBeenRemovedFromState)
-            return;
+            return false;
 
         switch (context.BurnMode)
         {
             case YalisalinFireComponentBurnMode.Exhaust:
                 await CardCmd.Exhaust(choiceContext, burned, skipVisuals: context.SkipBurnVisuals);
                 context.MarkBurned(burned);
-                break;
+                return true;
             case YalisalinFireComponentBurnMode.RemoveFromCombat:
                 await CardPileCmd.RemoveFromCombat(burned, context.SkipBurnVisuals);
                 context.MarkBurned(burned);
-                break;
+                return true;
             case YalisalinFireComponentBurnMode.None:
-                break;
+                return false;
             default:
                 throw new ArgumentOutOfRangeException(nameof(context.BurnMode), context.BurnMode, null);
         }
@@ -518,6 +551,12 @@ public static class YalisalinFireComponentResolver
         }
 
         foreach (var card in YalisalinFireComponentRules.AllCombatCards(context.Owner))
+        foreach (var modifier in YalisalinFireComponentRules.CardModifiers(card))
+            yield return modifier;
+
+        // 消耗堆里的牌同样参与：「第五次自证」写明无论此牌在哪都能计数与添火，而它最常见的去处就是被余火烧进消耗堆。
+        // 其余卡面修饰器都以「源卡/被烧牌是自己」为前提，放进来不会额外生效。
+        foreach (var card in PileType.Exhaust.GetPile(context.Owner).Cards)
         foreach (var modifier in YalisalinFireComponentRules.CardModifiers(card))
             yield return modifier;
     }

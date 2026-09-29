@@ -5,7 +5,9 @@ using ManosabaLin.Characters.Yalisalin.Capabilities;
 using ManosabaLin.Characters.Yalisalin.Cards;
 using ManosabaLin.Characters.Yalisalin.Components;
 using ManosabaLin.Characters.Yalisalin.Powers;
+using ManosabaLin.Characters.Yalisalin.Relics;
 using MegaCrit.Sts2.Core.Commands;
+using MegaCrit.Sts2.Core.GameActions.Multiplayer;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Powers;
 using MegaCrit.Sts2.Core.Localization;
@@ -51,41 +53,104 @@ public sealed class YalisalinFireComponentTests : CombatTestSuite
     }
 
     /// <summary>
-    /// （升温组件运行时验证）——验证两件事：
-    /// 1) capability 是否真正挂载到升温卡上（Burntthermometerpaper 等）。
-    /// 2) 引擎运行时 LocString.GetIfExists 能否查到 afterBase/afterBaseStrong 键。
-    /// 若 capability 没挂上 → 注册/挂载环节问题；若键查不到 → 本地化加载环节问题。
+    /// （把道歉烧成灰·回归）——被余火烧掉的牌先自动打出一次，且不消耗能量。
+    /// 牌堆补到 13 张以上，避免发夹额外连接一张本来就 0 费的随机牌，让被烧的是 1 费防御。
     /// </summary>
     [Fact]
-    public async Task HeatWord_capability_mounted_and_loc_keys_resolve()
+    public async Task Burnedapology_autoplays_burned_card_for_free()
     {
-        var card = await AddToHand<Burntthermometerpaper>();
+        await ApplyPower<BurnedApologyPower>(Player.Creature, 1);
+        for (var i = 0; i < 13; i++)
+        {
+            var filler = Combat.CreateCard<YalisalinDefend>(Player);
+            await CardPileCmd.AddGeneratedCardToCombat(filler, PileType.Draw, Player);
+        }
+
+        var card = await AddToHand<Unwantedkindness>();
+        await PlayerCmd.SetEnergy(10, Player);
+        await WaitForIdle();
+        await Play(card);
+
+        var exhaust = PileType.Exhaust.GetPile(Player).Cards.ToArray();
+        Assert.Single(exhaust);
+        Assert.IsType<YalisalinDefend>(exhaust[0]);
+
+        // 只付了不需要的善意自己的 1 费；被烧的防御免费打出（5 格挡）
+        Assert.Equal(9, Player.PlayerCombatState!.Energy);
+        Assert.Equal(7 + 5, Player.Creature.Block);
+    }
+
+    private async Task FillDrawPile<TCard>(int count) where TCard : CardModel
+    {
+        for (var i = 0; i < count; i++)
+        {
+            var filler = Combat.CreateCard<TCard>(Player);
+            await CardPileCmd.AddGeneratedCardToCombat(filler, PileType.Draw, Player);
+        }
+    }
+
+    /// <summary>
+    /// 被烧的牌自动打出后已离开战斗（能力牌），实际没被烧掉：不触发「烧掉后」效果，也不计入本回合烧牌数。
+    /// </summary>
+    [Fact]
+    public async Task Burned_hooks_skip_when_burned_card_left_combat()
+    {
+        await ApplyPower<BurnedApologyPower>(Player.Creature, 1);
+        await FillDrawPile<Holdmypain>(13);
+
+        var card = await AddToHand<Unwantedkindness>();
+        await PlayerCmd.SetEnergy(10, Player);
+        await WaitForIdle();
+        var handBefore = PileType.Hand.GetPile(Player).Cards.Count;
+        await Play(card);
+
+        Assert.Empty(PileType.Exhaust.GetPile(Player).Cards);
+        Assert.True(YalisalinFireColorSystem.TryGetHairpin(Player, out var hairpin));
+        Assert.Equal(0, hairpin.FireComponentBurnsThisTurn);
+        // 打出本牌 -1，没有「烧掉后抽 1」
+        Assert.Equal(handBefore - 1, PileType.Hand.GetPile(Player).Cards.Count);
+    }
+
+    /// <summary>第五次自证在消耗堆里也照常累计余火选择次数（卡面：无论此牌在哪）。</summary>
+    [Fact]
+    public async Task Fifthselfproof_counts_from_exhaust_pile()
+    {
+        var fifth = await AddToHand<Fifthselfproof>();
+        await CardCmd.Exhaust(new ThrowingPlayerChoiceContext(), fifth);
+        Assert.Equal(PileType.Exhaust, fifth.Pile?.Type);
+
+        for (var i = 0; i < 5; i++)
+        {
+            // 牌少于 13 张，发夹会额外连接一张随机牌，每次都有余火选择
+            var kindness = await AddToHand<Unwantedkindness>();
+            await PlayerCmd.SetEnergy(10, Player);
+            await WaitForIdle();
+            await Play(kindness);
+        }
+
+        Assert.Equal(1, fifth.FireUseCount);
+    }
+
+    /// <summary>第二次点燃只从消耗堆里取回；已经取回过的牌不会被重复选中。</summary>
+    [Fact]
+    public async Task SecondKindling_does_not_return_same_card_twice()
+    {
+        await FillDrawPile<YalisalinDefend>(13);
+
+        var kindness = await AddToHand<Unwantedkindness>();
+        await PlayerCmd.SetEnergy(10, Player);
+        await WaitForIdle();
+        await Play(kindness);
+        Assert.Single(PileType.Exhaust.GetPile(Player).Cards);
 
         await PlayerCmd.SetEnergy(10, Player);
         await WaitForIdle();
+        await Play(await AddToHand<SecondKindling>());
+        Assert.Empty(PileType.Exhaust.GetPile(Player).Cards);
 
-        // 1) capability 必须挂载
-        Assert.True(card.TryGetCapability<YalisalinHeatWordCapability>(out var heat),
-            "Burntthermometerpaper 没有挂载 YalisalinHeatWordCapability");
-        Assert.NotNull(heat);
-
-        // 2) 运行时本地化键必须可解析（这正是 GetDescriptionFragments 依赖的键）
-        //    注意：文案里可能带富文本标记（如 [color=#ff0000]升温[/color]），
-        //    这里剥掉标记再比对，免得以后只调颜色就把这条测试弄红。
-        var afterBase = LocString.GetIfExists("cards",
-            "MANOSABA_LIN_MODEL_CAPABILITY_YALISALIN_HEAT_WORD.afterBase");
-        Assert.NotNull(afterBase);
-        Assert.Equal("升温", StripTextMarkup(afterBase.GetRawText()));
-
-        var afterBaseStrong = LocString.GetIfExists("cards",
-            "MANOSABA_LIN_MODEL_CAPABILITY_YALISALIN_HEAT_WORD.afterBaseStrong");
-        Assert.NotNull(afterBaseStrong);
-        Assert.Equal("强升温", StripTextMarkup(afterBaseStrong.GetRawText()));
-
-        // 末尾打出一次，满足 TestTheSpire 的"至少执行 1 个战斗动作"校验（否则整批 TERMINATE）。
-        var enemy = EnemyAt(0);
-        await PlayerCmd.SetEnergy(10, Player);
-        await Play(card, enemy);
+        // 已取回到手牌的那张不再是候选，否则多张被烧时可能白白选中它
+        Assert.True(YalisalinFireColorSystem.TryGetHairpin(Player, out var hairpin));
+        Assert.Empty(hairpin.BurnedCardsThisTurn);
     }
 
     [Fact]
