@@ -4,17 +4,17 @@
   "MANOSABA_LIN_ENCHANTMENT_EMAAPPLE.description": "このカードをプレイすると、[b]最大HP[/b]を1獲得する。",
   "MANOSABA_LIN_ENCHANTMENT_REBUTTAL.title": "反論",
   "MANOSABA_LIN_ENCHANTMENT_REBUTTAL.extraCardText": "{Amount} 枚の[color=#339966][カウンター][/color]カードをプレイしました",
-  "MANOSABA_LIN_ENCHANTMENT_REBUTTAL.description": "このターンに[b][color=#339966][カウンター][/color][/b]で魔法をかけたカードの枚数を記録します。\n ターン毎にリセット",
+  "MANOSABA_LIN_ENCHANTMENT_REBUTTAL.description": "このターンに[b][color=#339966]【反論】[/color][/b]エンチャントでプレイしたカードの枚数を記録する。\nターンごとにリセット",
   "MANOSABA_LIN_ENCHANTMENT_AGREEMENT.title": "そう思う",
   "MANOSABA_LIN_ENCHANTMENT_AGREEMENT.extraCardText": "{Amount} [color=#6699cc] [同意] [/color] 枚のカードをプレイしました",
-  "MANOSABA_LIN_ENCHANTMENT_AGREEMENT.description": "このターンに[b][color=#6699cc][同意][/color][/b]で魔法をかけたカードの枚数を記録します。\n ターン毎にリセット",
+  "MANOSABA_LIN_ENCHANTMENT_AGREEMENT.description": "このターンに[b][color=#6699cc]【そう思う】[/color][/b]エンチャントでプレイしたカードの枚数を記録する。\nターンごとにリセット",
   "MANOSABA_LIN_ENCHANTMENT_DOUBT.title": "質問",
   "MANOSABA_LIN_ENCHANTMENT_DOUBT.extraCardText": "{Amount} 枚の[color=#cc9966][ QUESTION ][/color]カードをプレイしました",
-  "MANOSABA_LIN_ENCHANTMENT_DOUBT.description": "[b][color=#cc9966][質問][/color][/b]がこのターンに魔法をかけたカードの枚数を記録します。\n ターン毎にリセット",
-  "MANOSABA_LIN_ENCHANTMENT_WITCHIFICATION.title": "魔術",
+  "MANOSABA_LIN_ENCHANTMENT_DOUBT.description": "このターンに[b][color=#cc9966]【質問】[/color][/b]エンチャントでプレイしたカードの枚数を記録する。\nターンごとにリセット",
+  "MANOSABA_LIN_ENCHANTMENT_WITCHIFICATION.title": "魔女化",
   "MANOSABA_LIN_ENCHANTMENT_WITCHIFICATION.extraCardText": "このカードをプレイすると、もう一度自動的にプレイする",
   "MANOSABA_LIN_ENCHANTMENT_WITCHIFICATION.description": "このカードをプレイすると、もう一度自動的にプレイする",
   "MANOSABA_LIN_ENCHANTMENT_MLYPOWER.title": "魔法の遺産",
-  "MANOSABA_LIN_ENCHANTMENT_MLYPOWER.extraCardText": "当たると少しダメージを受ける",
-  "MANOSABA_LIN_ENCHANTMENT_MLYPOWER.description": "当たると少しダメージを受ける"
+  "MANOSABA_LIN_ENCHANTMENT_MLYPOWER.extraCardText": "このカードをプレイしたとき、1点のダメージを受ける",
+  "MANOSABA_LIN_ENCHANTMENT_MLYPOWER.description": "このカードをプレイしたとき、1点のダメージを受ける"
 }

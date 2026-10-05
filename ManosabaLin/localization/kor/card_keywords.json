@@ -1,12 +1,12 @@
 {
   "MANOSABA_LIN_KEYWORD_TRANSMIGRATION.title": "환생",
-  "MANOSABA_LIN_KEYWORD_TRANSMIGRATION.description": "[color=#CC6666] [Death Retracement] [/color] 의 선물, [color=#CC6666] [Death Retracement] [/color] 의 저주 \n [color=#CC6666] [Reincarnation] [/color] (으) 로 카드를 플레이하면 자동으로 드로우 스택에서 [color=#CC6666] [Reincarnation] [/color] (카드 최대 2장) 으로 동일한 이름 카드를 플레이합니다.",
+  "MANOSABA_LIN_KEYWORD_TRANSMIGRATION.description": "[color=#CC6666] [Death Retracement] [/color] 의 선물, [color=#CC6666] [Death Retracement] [/color] 의 저주 \n [color=#CC6666] [Reincarnation] [/color] (으) 로 카드를 플레이하면 자동으로 드로우 스택에서 [color=#CC6666] [Reincarnation] [/color] (카드 최대 2장) 으로 동일한 이름 카드를 플레이한다.",
   "MANOSABA_LIN_KEYWORD_TRANSMIGRATION3.title": "환생 환생",
   "MANOSABA_LIN_KEYWORD_TRANSMIGRATION3.description": "[color=#CC6666] [환생] [/color] 으로 카드를 플레이할 때, 한 번에 최대 3장까지 어디서든 [color=#CC6666] [환생] [/color] 으로 카드를 플레이하세요",
   "MANOSABA_LIN_KEYWORD_AGREE.title": "동의",
-  "MANOSABA_LIN_KEYWORD_AGREE.description": "1 ~ 5의 배수로 발동 \n × 1: 모든 아군에게 방패 3개 \n × 2: 모든 아군에게 방패 3개 \n × 3: 모든 아군에게 일시적 신속 레이어 1개 \n × 4: 모든 아군에게 일시적 파워 레이어 2개 \n × 5: 무작위 핸드 카드 1장을 무료로 1회 플레이할 수 있으며, 모든 아군에게 에너지 1점을 부여합니다.",
+  "MANOSABA_LIN_KEYWORD_AGREE.description": "1 ~ 5의 배수로 발동 \n × 1: 모든 아군에게 방패 3개 \n × 2: 모든 아군에게 방패 3개 \n × 3: 모든 아군에게 일시적 신속 레이어 1개 \n × 4: 모든 아군에게 일시적 파워 레이어 2개 \n × 5: 무작위 핸드 카드 1장을 무료로 1회 플레이할 수 있으며, 모든 아군에게 에너지 1점을 부여한다.",
   "MANOSABA_LIN_KEYWORD_DOUBT.title": "질문",
   "MANOSABA_LIN_KEYWORD_DOUBT.description": "1에서 5까지의 배수로 트리거됨 \n × 1: 자신 \n 을 (를) 위한 방패 1개 획득 × 2: 자신 \n 을 (를) 위한 카드 1개 뽑기 × 3: 자신 \n 을 (를) 위한 에너지 포인트 1개 획득 × 4: 버려진 카드 덱 1개 재활용 \n × 5: 1 핸드 리플레이 추가 1, 1 핸드 획득 1 [color=#339966] [[/color] [color=#cc9966] 리뷰 [/color] [color=#6699cc] 판사 [/color] [color=#339966]] [/color] 마법",
   "MANOSABA_LIN_KEYWORD_REBUTTAL.title": "반박",
-  "MANOSABA_LIN_KEYWORD_REBUTTAL.description": "1 ~ 5의 배수로 발동 \n x1: 무작위로 1의 피해를 줍니다 \n x2: 무작위로 1의 파워를 얻습니다 \n x3: 모든 적에게 취약점 스택을 1개 얻습니다 \n x4: 무작위로 1의 피해를 줍니다 \n x5: 이 카드에 1의 추가 피해를 줍니다"
+  "MANOSABA_LIN_KEYWORD_REBUTTAL.description": "1 ~ 5의 배수로 발동 \n x1: 무작위로 1의 피해를 준다 \n x2: 무작위로 1의 파워를 얻는다 \n x3: 모든 적에게 취약점 스택을 1개 얻는다 \n x4: 무작위로 1의 피해를 준다 \n x5: 이 카드에 1의 추가 피해를 준다"
 }

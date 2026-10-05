@@ -23,5 +23,9 @@
   "MANOSABALIN_TELEMETRY_DIAGNOSTICS": "Диагностика",
   "MANOSABALIN_TELEMETRY_RUNS": "История забегов",
   "MANOSABALIN_YESNO.yes": "Да",
-  "MANOSABALIN_YESNO.no": "Нет"
+  "MANOSABALIN_YESNO.no": "Нет",
+  "MANOSABALIN_SETTINGS.hextech.section.title": "Руны Хекстека (кроссовер)",
+  "MANOSABALIN_SETTINGS.hextech.section.description": "Если установлен мод Hextech Runes, управляет появлением эксклюзивных кроссовер-рун ManosabaLin.",
+  "MANOSABALIN_SETTINGS.hextech.enabled.label": "Включить кроссовер-руны Хекстека",
+  "MANOSABALIN_SETTINGS.hextech.enabled.description": "При включении Анан/Хиро/Шерри могут получить эксклюзивные кроссовер-руны этого мода при выборе Хекстека на каждом этаже. Действует только при установленном Hextech Runes."
 }

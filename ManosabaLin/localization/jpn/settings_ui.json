@@ -23,5 +23,9 @@
   "MANOSABALIN_TELEMETRY_DIAGNOSTICS": "診断情報",
   "MANOSABALIN_TELEMETRY_RUNS": "履歴",
   "MANOSABALIN_YESNO.yes": "はい",
-  "MANOSABALIN_YESNO.no": "いいえ"
+  "MANOSABALIN_YESNO.no": "いいえ",
+  "MANOSABALIN_SETTINGS.hextech.section.title": "ヘックステックルーン（コラボ）",
+  "MANOSABALIN_SETTINGS.hextech.section.description": "Hextech Runes MODがインストールされている場合、ManosabaLin専用コラボルーンの出現を制御します。",
+  "MANOSABALIN_SETTINGS.hextech.enabled.label": "ヘックステックコラボルーンを有効にする",
+  "MANOSABALIN_SETTINGS.hextech.enabled.description": "有効にすると、アナン/ヒロ/シェリーが各フロアでヘックステックを選ぶ際に本MOD専用のコラボルーンを獲得する可能性があります。Hextech Runes導入時のみ有効。"
 }

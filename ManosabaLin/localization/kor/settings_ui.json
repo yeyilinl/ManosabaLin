@@ -1,6 +1,6 @@
 {
   "MANOSABALIN_UPDATE_POPUP.title": "마노사바린, 새로운 마녀 재판",
-  "MANOSABALIN_UPDATE_POPUP.body": "[color=#cccccc] 현재 사례: [/color] [color=#ff99cc] [color=#cccccc] [/color] \n [color=#cccccc] 최근 사례: [/color] [color=#CC6666] [/color] [/color] \n [color=#ff99cc] [b] \"총 [/b] [/color] [color=#CC6666] [b] 가해자\" [/b] [/color] 가 되십시오!",
+  "MANOSABALIN_UPDATE_POPUP.body": "[color=#cccccc]현재 사건:[/color] [color=#ff99cc]{0}[/color]\n[color=#cccccc]최신 사건:[/color] [color=#CC6666]{1}[/color]\n함께 [color=#ff99cc][b]「공[/b][/color][color=#CC6666][b]범」[/b][/color]이 됩시다!",
   "MANOSABALIN_UPDATE_POPUP.download": "공범자가 되세요",
   "MANOSABALIN_UPDATE_POPUP.close": "아마 다음 번에",
   "MANOSABALIN_SETTINGS.title": "마노사바린",
@@ -23,5 +23,9 @@
   "MANOSABALIN_TELEMETRY_DIAGNOSTICS": "진단 정보",
   "MANOSABALIN_TELEMETRY_RUNS": "히스토리",
   "MANOSABALIN_YESNO.yes": "예",
-  "MANOSABALIN_YESNO.no": "아니요"
+  "MANOSABALIN_YESNO.no": "아니요",
+  "MANOSABALIN_SETTINGS.hextech.section.title": "헥스테크 룬 (콜라보)",
+  "MANOSABALIN_SETTINGS.hextech.section.description": "Hextech Runes 모드가 설치되어 있을 때 ManosabaLin 전용 콜라보 룬의 등장 여부를 제어합니다.",
+  "MANOSABALIN_SETTINGS.hextech.enabled.label": "헥스테크 콜라보 룬 활성화",
+  "MANOSABALIN_SETTINGS.hextech.enabled.description": "활성화하면 아난/히로/셰리가 각 층에서 헥스테크를 선택할 때 본 모드 전용 콜라보 룬을 얻을 수 있습니다. Hextech Runes 설치 시에만 적용됩니다."
 }

@@ -11,7 +11,7 @@ using MegaCrit.Sts2.Core.Localization.DynamicVars;
 using MegaCrit.Sts2.Core.ValueProps;
 using STS2RitsuLib.Interop.AutoRegistration;
 
-namespace ManosabaLin.Characters.Hiro.Cards;
+namespace ManosabaLin.Characters.Sherrylin.Cards;
 
 [RegisterCard(typeof(SherrylinCardPool))]
 public sealed class Sherrymonvqiufan() : ManosabaCardTemplate(3, CardType.Attack, CardRarity.Uncommon, TargetType.AnyEnemy)
