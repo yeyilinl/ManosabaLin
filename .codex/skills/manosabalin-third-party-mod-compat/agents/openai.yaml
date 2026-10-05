@@ -1,0 +1,4 @@
+interface:
+  display_name: "ManosabaLin Third-Party Mod Compat"
+  short_description: "Audit cross-mod coexistence: Harmony overlap, soft-dependency contracts, init windows."
+  default_prompt: "Use $manosabalin-third-party-mod-compat to audit whether another STS2 mod can coexist with ManosabaLin, starting with the Harmony patch-target overlap scan."
