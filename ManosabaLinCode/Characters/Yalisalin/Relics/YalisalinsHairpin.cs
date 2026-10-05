@@ -102,14 +102,37 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
         }
     }
 
+    /// <summary>默认 6 格时的格位颜色（1-2 浅橙、3-4 亮黄、5-6 赤红）。</summary>
     public static YalisalinFireColor SlotColor(int slot)
     {
+        return SlotColor(slot, MaxSegments);
+    }
+
+    /// <summary>
+    ///     按给定格数把三色均分成三段：每段 <c>maxSegments / 3</c> 格。
+    ///     6 格 ⇒ 1-2 / 3-4 / 5-6；12 格（「高塔」改造后）⇒ 1-4 / 5-8 / 9-12。
+    /// </summary>
+    public static YalisalinFireColor SlotColor(int slot, int maxSegments)
+    {
+        var band = Math.Max(1, maxSegments / 3);
         return slot switch
         {
-            <= 2 => YalisalinFireColor.LightOrange,
-            <= 4 => YalisalinFireColor.BrightYellow,
+            _ when slot <= band => YalisalinFireColor.LightOrange,
+            _ when slot <= band * 2 => YalisalinFireColor.BrightYellow,
             _ => YalisalinFireColor.Red
         };
+    }
+
+    /// <summary>
+    ///     当前生效的火色格上限：被「高塔」改造后为 12 格，否则为默认 <see cref="MaxSegments" />。
+    /// </summary>
+    public int CurrentMaxSegments =>
+        Owner?.Creature?.GetPower<YalisalinTowerPower>()?.FireColorSegments ?? MaxSegments;
+
+    /// <summary>按当前生效的火色格上限取格位颜色。</summary>
+    public YalisalinFireColor SlotColorFor(int slot)
+    {
+        return SlotColor(slot, CurrentMaxSegments);
     }
 
     public static IEnumerable<string> GetFireComponentEnhancementDescriptions(Player owner)
@@ -175,7 +198,7 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
 
     public bool IsFireColorFull(Creature target)
     {
-        return GetFireColorCount(target) >= MaxSegments;
+        return GetFireColorCount(target) >= CurrentMaxSegments;
     }
 
     public void QueueUnneededGoodChild(int energyGain)
@@ -196,6 +219,12 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
             return;
 
         _glassReturnCards.Add((card, block));
+    }
+
+    /// <summary>登记一张「下回合返回手牌」的牌（不给格挡）。</summary>
+    public void QueueHandReturn(CardModel card)
+    {
+        QueueGlassReturn(card, 0);
     }
 
     public void TrackBringHome(CardModel card, int energy, int draw)
@@ -354,7 +383,10 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
         TicketEnergyGrantedThisTurn = false;
         _chain.Reset();
         foreach (var gauge in _gauges.Values)
+        {
             gauge.MarkTurnStart();
+            gauge.ResetOverflowTracking();
+        }
 
         // 新回合开始：把已结束回合的宽恕/自惩数转移到“上一回合”
         SinForgiveLastTurn = SinForgiveThisTurn;
@@ -368,7 +400,8 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
             {
                 await CardPileCmd.Add(card, PileType.Hand);
                 card.EnergyCost.SetThisTurnOrUntilPlayed(0, reduceOnly: true);
-                await CreatureCmd.GainBlock(Owner.Creature, block, ValueProp.Move, cardPlay: null);
+                if (block > 0)
+                    await CreatureCmd.GainBlock(Owner.Creature, block, ValueProp.Move, cardPlay: null);
             }
 
             _glassReturnCards.Remove((card, block));
@@ -530,7 +563,13 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
         }
 
         if (cost > 3 && YalisalinFireComponentRules.HasFireComponent(context.BurnedCard))
+        {
             await PlayerCmd.GainEnergy(UnneededGoodChildPendingEnergy, Owner);
+
+            // 「不被需要的好孩子」卡面：费用大于3且自带余火时「获得能量然后打出其」。
+            // 复用「把道歉烧成灰」的免费自动打出通道：先打出、再烧掉。
+            context.CustomData["AutoPlayBurnedCard"] = true;
+        }
 
         UnneededGoodChildPendingEnergy = 0;
         UnneededGoodChildPendingCount = 0;
@@ -632,8 +671,11 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
     ///     给予目标火色，从最低的空格往上填。「窗上的车票」的额外格数在这里统一加上。
     ///
     ///     量表已满时多出来的格数默认直接丢弃；<paramref name="overflowTriggersConsume" /> 为真时（「予燎」类效果），
-    ///     多出的第 k 格按第 k 个格位的颜色一次性补结算消耗效果（超出 1-2 格为浅橙，3-4 格亮黄，5-6 格赤红，
-    ///     再往后循环），这批补结算自成一条连续链，不与本回合此前的消耗相连。
+    ///     多出的每一格按「溢出色序」结算该格位的消耗效果：第 1-2 格浅橙、第 3-4 格亮黄、第 5-6 格赤红，
+    ///     第 7 格回到浅橙（<c>SlotColor(n % 6 + 1)</c>，每 6 格一循环）。
+    ///     溢出**不改变量表格数**（始终满格），所以只要持续给出火色就会持续溢出、持续结算。
+    ///     溢出色序与连续链都记在目标各自的量表上，因此同一回合内先后多次溢出会接着往后数，
+    ///     并像普通消耗那样两两同色构成「连续」；这条链与普通消耗的链互不干扰。
     /// </summary>
     /// <returns>实际填进量表的格数。</returns>
     public async Task<int> GiveFireColor(
@@ -648,7 +690,7 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
 
         var total = amount + TicketStacks;
         var gauge = GetOrCreateGauge(target);
-        var added = gauge.Fill(total);
+        var added = gauge.Fill(total, CurrentMaxSegments);
         var overflow = total - added;
 
         FireGivenThisTurn += added + (overflowTriggersConsume ? overflow : 0);
@@ -663,9 +705,12 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
 
         if (overflowTriggersConsume && overflow > 0)
         {
-            var overflowChain = new YalisalinFireColorChain();
+            // 溢出色序与连续链挂在目标的量表上，跨多次给予持续累计（回合开始才重置）。
             for (var i = 0; i < overflow; i++)
-                await ResolveConsumedColor(choiceContext, target, SlotColor(i % MaxSegments + 1), source, overflowChain, 1);
+            {
+                var slot = gauge.TakeNextOverflowSlot(CurrentMaxSegments);
+                await ResolveConsumedColor(choiceContext, target, SlotColorFor(slot), source, gauge.OverflowChain, 1);
+            }
         }
 
         return added;
@@ -737,7 +782,7 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
     {
         var filled = GetFireColorCount(target);
         return Enumerable.Range(1, filled)
-            .Select(static slot => new YalisalinFireColorSegment(SlotColor(slot), slot))
+            .Select(slot => new YalisalinFireColorSegment(SlotColorFor(slot), slot))
             .ToArray();
     }
 
@@ -749,7 +794,7 @@ public sealed class YalisalinsHairpin : ManosabaRelicTemplate, IYalisalinFireCom
         CardModel? source,
         int effectMultiplier)
     {
-        var color = SlotColor(slot);
+        var color = SlotColorFor(slot);
         gauge.RemoveSlot();
         Flash();
         await ResolveConsumedColor(choiceContext, target, color, source, _chain, effectMultiplier);
@@ -981,9 +1026,9 @@ internal sealed class YalisalinFireColorGauge
 
     public int GivenThisTurn => Filled - TurnStartFloor;
 
-    public int Fill(int amount)
+    public int Fill(int amount, int maxSegments)
     {
-        var added = Math.Clamp(amount, 0, YalisalinsHairpin.MaxSegments - Filled);
+        var added = Math.Clamp(amount, 0, maxSegments - Filled);
         Filled += added;
         return added;
     }
@@ -1000,6 +1045,29 @@ internal sealed class YalisalinFireColorGauge
     public void MarkTurnStart()
     {
         TurnStartFloor = Filled;
+    }
+
+    /// <summary>
+    ///     本回合该目标已溢出的累计格数，决定下一格溢出使用哪个格位的颜色（<c>n % 6 + 1</c>，每 6 格一循环）。
+    /// </summary>
+    public int OverflowConsumedThisTurn { get; private set; }
+
+    /// <summary>溢出的连续链（与普通消耗的 <c>_chain</c> 分开，互不干扰）。</summary>
+    public YalisalinFireColorChain OverflowChain { get; } = new();
+
+    /// <summary>取下一格溢出对应的格位（1..当前格数上限），并推进溢出计数。</summary>
+    public int TakeNextOverflowSlot(int maxSegments)
+    {
+        var slot = OverflowConsumedThisTurn % Math.Max(1, maxSegments) + 1;
+        OverflowConsumedThisTurn++;
+        return slot;
+    }
+
+    /// <summary>回合开始：清空溢出色序与溢出连续链。</summary>
+    public void ResetOverflowTracking()
+    {
+        OverflowChain.Reset();
+        OverflowConsumedThisTurn = 0;
     }
 }
 

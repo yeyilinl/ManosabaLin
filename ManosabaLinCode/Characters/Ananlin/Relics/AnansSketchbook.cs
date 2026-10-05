@@ -1,6 +1,7 @@
 using ManosabaLin.Characters.Ananlin.Capabilities;
 using ManosabaLin.Characters.Ananlin.Cards;
 using ManosabaLin.Characters.Ananlin.Powers;
+using ManosabaLin.Characters.Common.LinRelics;
 using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Powers;
@@ -84,7 +85,6 @@ public class AnansSketchbook : ManosabaRelicTemplate
         _pendingReassuranceMatchType = null;
         AnanlinSilenceIntentManager.ResetSecondTamperAllowances();
         await OfferFirstCombatRecordReward(choiceContext);
-        await AddSilence(choiceContext, 1, null);
         AssignReassuranceMark();
     }
 
@@ -250,11 +250,15 @@ public class AnansSketchbook : ManosabaRelicTemplate
         var baseOptionCount = recordedPools.Length < MaxRecordedPools ? 1 : MaxRecordedPools;
         var optionCount = Math.Max(1, baseOptionCount + (indexPower?.Amount ?? 0));
         var options = RollCombatCardsFromRecordedPools((int)optionCount, null, rng);
-        if (options.Count == 0) return [];
 
         if (source.IsUpgraded)
             foreach (var option in options)
                 CardCmd.Upgrade(option);
+
+        // 【连线】海克斯「无色书页」：书页额外多送一个「可免费打出一次的无色牌」选项。
+        // 放在升级循环之后 ⇒ 追加的那张无色牌不会被书页带升级；其余行为一字未动。
+        HextechColorlessPage.AppendColorlessOption(Owner, options);
+        if (options.Count == 0) return [];
 
         IReadOnlyList<CardModel> selected;
         if (options.Count == 1)
@@ -292,11 +296,14 @@ public class AnansSketchbook : ManosabaRelicTemplate
         if (recordedPools.Length == 0) return [];
 
         var options = RollMarginPageOptions(recordedPools, Owner.RunState.Rng.CombatCardGeneration);
-        if (options.Count == 0) return [];
 
         if (source.IsUpgraded)
             foreach (var option in options)
                 CardCmd.Upgrade(option);
+
+        // 【连线】海克斯「无色书页」：同上。
+        HextechColorlessPage.AppendColorlessOption(Owner, options);
+        if (options.Count == 0) return [];
 
         var selected = (await CardSelectCmd.FromSimpleGrid(
             choiceContext,
@@ -343,11 +350,14 @@ public class AnansSketchbook : ManosabaRelicTemplate
 
         var rng = caster.RunState.Rng.CombatCardGeneration;
         var options = RollBorrowedMarginOptions(caster, pools, rng);
-        if (options.Count == 0) return [];
 
         if (source.IsUpgraded)
             foreach (var option in options)
                 CardCmd.Upgrade(option);
+
+        // 【连线】海克斯「无色书页」：认**实际打出这张书页的玩家**（借来的留白书页可能由队友打出）。
+        HextechColorlessPage.AppendColorlessOption(caster, options);
+        if (options.Count == 0) return [];
 
         var selected = (await CardSelectCmd.FromSimpleGrid(
             choiceContext,
@@ -365,7 +375,7 @@ public class AnansSketchbook : ManosabaRelicTemplate
         return added;
     }
 
-    private static IReadOnlyList<CardModel> RollBorrowedMarginOptions(
+    private static List<CardModel> RollBorrowedMarginOptions(
         Player caster,
         IReadOnlyList<CardPoolModel> pools,
         MegaCrit.Sts2.Core.Random.Rng rng)
@@ -694,6 +704,9 @@ public class AnansSketchbook : ManosabaRelicTemplate
             .FirstOrDefault();
         if (selectedPool is not null)
             TryRecordPoolWithFeedback(selectedPool);
+
+        // 按本地化描述：三选一选中的卡牌「加入到牌组」（永久加入跑图牌组）。
+        CardCmd.PreviewCardPileAdd(await CardPileCmd.Add(selected, PileType.Deck));
     }
 
     private IEnumerable<CardPoolModel> GetRecordedPools()
@@ -792,7 +805,7 @@ public class AnansSketchbook : ManosabaRelicTemplate
         return options;
     }
 
-    private IReadOnlyList<CardModel> RollMarginPageOptions(
+    private List<CardModel> RollMarginPageOptions(
         IReadOnlyList<CardPoolModel> pools,
         MegaCrit.Sts2.Core.Random.Rng rng)
     {

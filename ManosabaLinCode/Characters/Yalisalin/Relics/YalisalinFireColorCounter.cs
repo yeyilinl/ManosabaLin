@@ -6,6 +6,8 @@ using MegaCrit.Sts2.Core.Localization;
 using MegaCrit.Sts2.Core.Nodes.HoverTips;
 using MegaCrit.Sts2.Core.Nodes.Rooms;
 using MegaCrit.Sts2.Core.Nodes.Screens.ScreenContext;
+using System;
+using System.Linq;
 
 namespace ManosabaLin.Characters.Yalisalin.Relics;
 
@@ -15,11 +17,6 @@ public partial class YalisalinFireColorCounter : Control
     private const float SlotGap = 4f;
     private const float LeftPadding = 10f;
     private const int Columns = 1;
-    private const int Rows = YalisalinsHairpin.MaxSegments;
-
-    private static readonly Vector2 CounterSize = new(
-        SlotSize * Columns + SlotGap * (Columns - 1),
-        SlotSize * Rows + SlotGap * (Rows - 1));
 
     private static readonly Color EmptyColor = new("2b2021");
 
@@ -30,20 +27,40 @@ public partial class YalisalinFireColorCounter : Control
     private string _lastSignature = string.Empty;
     private int _hoveredSlotIndex = -1;
 
+    /// <summary>当前槽位数（默认 6；被「高塔」改造后为 12，会动态重建）。</summary>
+    private int _rows = YalisalinsHairpin.MaxSegments;
+
+    private static Vector2 ComputeSize(int rows)
+    {
+        return new Vector2(
+            SlotSize * Columns + SlotGap * (Columns - 1),
+            SlotSize * rows + SlotGap * (rows - 1));
+    }
+
+    private int CurrentMaxSegments
+    {
+        get
+        {
+            if (_viewer != null && YalisalinFireColorSystem.TryGetHairpin(_viewer, out var hairpin))
+                return Math.Max(1, hairpin.CurrentMaxSegments);
+
+            return YalisalinsHairpin.MaxSegments;
+        }
+    }
+
     public override void _Ready()
     {
-        Size = CounterSize;
-        CustomMinimumSize = CounterSize;
         MouseFilter = MouseFilterEnum.Pass;
         ZIndex = 20;
 
-        BuildSlots();
+        RebuildSlots(CurrentMaxSegments);
         Refresh(force: true);
     }
 
     public override void _ExitTree()
     {
         NHoverTipSet.Remove(this);
+
         foreach (var slot in _slots)
             NHoverTipSet.Remove(slot);
     }
@@ -67,16 +84,26 @@ public partial class YalisalinFireColorCounter : Control
         Refresh();
     }
 
-    private void BuildSlots()
+    private void RebuildSlots(int rows)
     {
-        if (_slots.Length > 0)
-            return;
+        foreach (var slot in _slots)
+        {
+            NHoverTipSet.Remove(slot);
+            RemoveChild(slot);
+            slot.QueueFree();
+        }
 
-        _slots = Enumerable.Range(0, YalisalinsHairpin.MaxSegments)
+        _rows = Math.Max(1, rows);
+
+        var size = ComputeSize(_rows);
+        Size = size;
+        CustomMinimumSize = size;
+
+        _slots = Enumerable.Range(0, _rows)
             .Select(CreateSlot)
             .ToArray();
 
-        _slotColors = new YalisalinFireColor?[YalisalinsHairpin.MaxSegments];
+        _slotColors = new YalisalinFireColor?[_rows];
 
         for (var i = 0; i < _slots.Length; i++)
         {
@@ -86,6 +113,9 @@ public partial class YalisalinFireColorCounter : Control
             slot.Connect(SignalName.MouseExited, Callable.From(() => OnSlotUnhovered(index)));
             AddChild(slot);
         }
+
+        _hoveredSlotIndex = -1;
+        _lastSignature = string.Empty;
     }
 
     private static ColorRect CreateSlot(int index)
@@ -107,9 +137,11 @@ public partial class YalisalinFireColorCounter : Control
         if (_target?.GetCreatureNode() is not { Hitbox: { } hitbox })
             return;
 
+        var size = ComputeSize(_rows);
+
         GlobalPosition = new Vector2(
-            hitbox.GlobalPosition.X - CounterSize.X - LeftPadding,
-            hitbox.GlobalPosition.Y + Math.Max(0f, (hitbox.Size.Y - CounterSize.Y) * 0.5f));
+            hitbox.GlobalPosition.X - size.X - LeftPadding,
+            hitbox.GlobalPosition.Y + Math.Max(0f, (hitbox.Size.Y - size.Y) * 0.5f));
     }
 
     private bool CanShowInCurrentContext()
@@ -145,6 +177,14 @@ public partial class YalisalinFireColorCounter : Control
 
     private void Refresh(bool force = false)
     {
+        // 「高塔」改造火色格的瞬间，槽位数量会变；这里检测到变化就重建。
+        var max = CurrentMaxSegments;
+        if (max != _rows)
+        {
+            RebuildSlots(max);
+            force = true;
+        }
+
         var segments = GetVisibleSegments();
         var signature = string.Join(';', segments.Select(segment => $"{(int)segment.Color}:{segment.Order}"));
 
@@ -172,7 +212,7 @@ public partial class YalisalinFireColorCounter : Control
         return YalisalinFireColorSystem
             .GetFireColorSegments(_viewer, _target)
             .OrderBy(segment => segment.Order)
-            .Take(YalisalinsHairpin.MaxSegments)
+            .Take(_rows)
             .ToArray();
     }
 
@@ -184,6 +224,9 @@ public partial class YalisalinFireColorCounter : Control
 
     private void OnSlotUnhovered(int index)
     {
+        if (index < 0 || index >= _slots.Length)
+            return;
+
         NHoverTipSet.Remove(_slots[index]);
         if (_hoveredSlotIndex == index)
             _hoveredSlotIndex = -1;

@@ -11,7 +11,7 @@ using STS2RitsuLib.Interop.AutoRegistration;
 namespace ManosabaLin.Characters.Hiro.Cards;
 
 [RegisterCard(typeof(HirolinCardPool))]
-public sealed class SharedWitchRitual() : ManosabaCardTemplate(2, CardType.Skill, CardRarity.Uncommon, TargetType.AnyAlly)
+public sealed class SharedWitchRitual() : ManosabaCardTemplate(1, CardType.Skill, CardRarity.Uncommon, TargetType.AnyAlly)
 {
     public override CardMultiplayerConstraint MultiplayerConstraint => CardMultiplayerConstraint.MultiplayerOnly;
     private const int RequiredWitchification = 100;

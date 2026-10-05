@@ -28,6 +28,10 @@ public class CardSixtyOne() : ManosabaCardTemplate(1, CardType.Skill, CardRarity
     protected override async Task OnPlay(PlayerChoiceContext choiceContext, CardPlay cardPlay, ComponentContext componentContext)
     {
         await CreatureCmd.GainBlock(Owner.Creature, DynamicVars.Block, cardPlay);
+
+        // 卡面：「获得 N 点格挡和获得 N 点下回合格挡」——两个数值同为 DynamicVars.Block。
+        await PowerCmd.Apply<BlockNextTurnPower>(
+            choiceContext, Owner.Creature, DynamicVars.Block.BaseValue, Owner.Creature, this);
     }
 
     protected override void OnUpgrade(ComponentContext componentContext)

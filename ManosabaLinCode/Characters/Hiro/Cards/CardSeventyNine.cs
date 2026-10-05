@@ -68,6 +68,25 @@ public sealed class CardSeventyNine() : ManosabaCardTemplate(1, CardType.Skill, 
             card.AddModKeyword(rebirthId);
             RefreshCardVisuals(card);
         }
+
+        // 3. 升级追加（卡面 {IfUpgraded:show:并使后一张卡名改为前一张卡卡名|}）：
+        //    把「获得轮回的那些卡」（后一张）的卡名改成「失去轮回的那张卡」（前一张）的卡名。
+        //    两张卡因此**同名** ⇒ 【轮回】能互相认出对方（见 CardRename.SameName）。
+        //    ⚠️ 只改卡名显示，卡的效果 / 描述一字不动。
+        if (!IsUpgraded) return;
+
+        var removeList = cardsToRemove.ToList();
+        var grantList = cardsToGrant.ToList();
+        if (removeList.Count == 0 || grantList.Count == 0) return;
+
+        var newName = CardRename.EffectiveName(removeList[0]);
+        if (string.IsNullOrEmpty(newName)) return;
+
+        foreach (var card in grantList)
+        {
+            CardRename.Set(card, newName);
+            RefreshCardVisuals(card);
+        }
     }
 
     private static void RefreshCardVisuals(CardModel card)

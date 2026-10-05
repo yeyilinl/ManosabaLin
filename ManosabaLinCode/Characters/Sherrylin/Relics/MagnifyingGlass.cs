@@ -29,11 +29,15 @@ public class MagnifyingGlass : ManosabaRelicTemplate
     public bool HasTriggeredThisCombat { get; set; }
     public int CaseReversalDiscardToExhaustCount { get; set; }
 
+    /// <summary>本回合【翻案】发生的次数（玩家回合开始清零；愚者等卡按它结算）。</summary>
+    public int CaseReversalCountThisTurn { get; set; }
+
     public override async Task AfterSideTurnStart(CombatSide side, IReadOnlyList<Creature> participants, ICombatState combatState)
     {
         if (side != Owner.Creature.Side) return;
 
         HasTriggeredThisCombat = false;
+        CaseReversalCountThisTurn = 0;
 
         var queue = Owner.PlayerCombatState?.OrbQueue;
         if (queue != null)
@@ -95,6 +99,7 @@ public class MagnifyingGlass : ManosabaRelicTemplate
         }
 
         HasTriggeredThisCombat = true;
+        CaseReversalCountThisTurn++;
 
         var exhaustCards = exhaustPileSwap.Cards
             .Where(c => c is not ICaseFileCard)

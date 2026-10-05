@@ -401,6 +401,10 @@ public static class YalisalinFireComponentResolver
     ///     手动以 skipVisuals 从手牌移走时，原版不会搬运手牌里的 NCard 节点，牌面会残留在手牌区。
     ///     <paramref name="free" /> 为真时按原版 <see cref="CardCmd.AutoPlay" /> 的口径结算：不扣能量/星星，
     ///     X 费取当前能量。
+    ///
+    ///     打出前同样走一次原版自动打出的前置钩子 <see cref="Hook.BeforeCardAutoPlayed" />：
+    ///     原版 <see cref="CardCmd.AutoPlay" /> 与本仓库的 <c>AnanlinCardHelpers.ResolveAsFreeCardEffect</c>
+    ///     都会调用它，缺了这一步「观看自动打出」的模型（成就计数等）看不到余火的自动打出。
     /// </summary>
     private static async Task PlayCardWithSuppressedFireComponent(
         PlayerChoiceContext choiceContext,
@@ -459,6 +463,9 @@ public static class YalisalinFireComponentResolver
         SuppressedCards.Add(card);
         try
         {
+            // 与原版 CardCmd.AutoPlay / AnanlinCardHelpers 一致：先广播「即将自动打出」，
+            // 再走 OnPlayWrapper 的自动打出分支。
+            await Hook.BeforeCardAutoPlayed(combatState, card, target, AutoPlayType.Default);
             await card.OnPlayWrapper(choiceContext, target, isAutoPlay: true, resources);
         }
         finally
@@ -478,6 +485,16 @@ public static class YalisalinFireComponentResolver
         switch (context.BurnMode)
         {
             case YalisalinFireComponentBurnMode.Exhaust:
+                // 牌已经因为自身效果（自带【消耗】/虚无等，例如被「把道歉烧成灰」先自动打出过一次）
+                // 进了消耗堆：再走一次 CardCmd.Exhaust 会重复触发 History.CardExhausted /
+                // Hook.AfterCardExhausted（「每当你消耗一张牌」类效果白拿两份）。
+                // 这里只记「已烧掉」，不重复消耗；燃烧数、抽牌等「烧掉后」效果照常结算。
+                if (burned.Pile?.Type == PileType.Exhaust)
+                {
+                    context.MarkBurned(burned);
+                    return true;
+                }
+
                 await CardCmd.Exhaust(choiceContext, burned, skipVisuals: context.SkipBurnVisuals);
                 context.MarkBurned(burned);
                 return true;

@@ -8,7 +8,7 @@ namespace ManosabaLin.Characters.Yalisalin.Cards;
 /// </summary>
 [RegisterCard(typeof(YalisalinCardPool))]
 public sealed class FlameFist()
-    : ManosabaCardTemplate(3, CardType.Power, CardRarity.Rare, TargetType.Self)
+    : ManosabaCardTemplate(1, CardType.Power, CardRarity.Rare, TargetType.Self)
 {
     protected override IEnumerable<DynamicVar> CanonicalVars =>
         [new PowerVar<UndeathPower>(UndeathPower.MaxStacks)];

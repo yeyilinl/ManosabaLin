@@ -41,7 +41,7 @@ public sealed class EmberBaptism()
             .WithHitFx("vfx/vfx_attack_slash")
             .Execute(choiceContext);
 
-        if (consumed < YalisalinsHairpin.MaxSegments)
+        if (consumed < hairpin.CurrentMaxSegments)
             return;
 
         await CardPileCmd.Draw(choiceContext, DynamicVars.Cards.IntValue, owner);

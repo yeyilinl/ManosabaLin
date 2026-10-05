@@ -84,7 +84,6 @@ public sealed class Lamort : ManosabaCardTemplate
             source.DynamicVars["RitualCeremonyPower"].BaseValue,
             creature, source, false);
 
-        var bond = creature.GetPower<BondPower>();
         var createCardMethod = typeof(ICombatState).GetMethod("CreateCard", new Type[] { typeof(Player) });
 
         for (int i = 0; i < 3; i++)
@@ -114,12 +113,9 @@ public sealed class Lamort : ManosabaCardTemplate
             await CardCmd.AutoPlay(choiceContext, picked, autoTarget);
         }
 
-        bond = creature.GetPower<BondPower>();
-        var affinity = bond?.Affinity ?? 0;
-        var estrangement = bond?.Estrangement ?? 0;
-        var higherBondValue = Math.Max(affinity, estrangement);
-        var lowerBondValue = Math.Min(affinity, estrangement);
-
+        // 卡面：「给予当前所有牌随机【审判】组件」
+        // （【审判】组件 = 赞同 AgreementTrialComponent / 反驳 RebuttalTrialComponent / 疑问 DoubtTrialComponent，
+        //   由对应附魔 Rebuttal / Agreement / Doubt 具现而来）
         var enchantTypes = new Type[] { typeof(Rebuttal), typeof(Agreement), typeof(Doubt) };
         var rng = owner.RunState.Rng.CombatCardSelection;
 
@@ -127,81 +123,52 @@ public sealed class Lamort : ManosabaCardTemplate
         var agreementCanonical = ModelDb.Enchantment<Agreement>();
         var doubtCanonical = ModelDb.Enchantment<Doubt>();
 
-        var judgmentCards = new List<CardModel>();
-        for (int i = 0; i < higherBondValue; i++)
-        {
-            var bondCard = CreateRandomBondCard(combatState, owner, createCardMethod);
-
-            var chosenEnchant = rng.NextItem(enchantTypes);
-            if (chosenEnchant == typeof(Rebuttal))
-                CardCmd.Enchant(rebuttalCanonical.ToMutable(), bondCard, 1m);
-            else if (chosenEnchant == typeof(Agreement))
-                CardCmd.Enchant(agreementCanonical.ToMutable(), bondCard, 1m);
-            else
-                CardCmd.Enchant(doubtCanonical.ToMutable(), bondCard, 1m);
-
-            judgmentCards.Add(bondCard);
-        }
-
-        var toDiscount = judgmentCards
-            .OrderBy(_ => rng.NextFloat())
-            .Take(lowerBondValue)
+        var allOwnedCards = new[] { PileType.Hand, PileType.Draw, PileType.Discard }
+            .SelectMany(pileType => pileType.GetPile(owner).Cards)
+            .Distinct()
             .ToList();
 
-        foreach (var card in toDiscount)
+        foreach (var card in allOwnedCards)
         {
-            card.EnergyCost.UpgradeBy(-1);
+            var chosenEnchant = rng.NextItem(enchantTypes);
+            if (chosenEnchant == typeof(Rebuttal))
+                CardCmd.Enchant(rebuttalCanonical.ToMutable(), card, 1m);
+            else if (chosenEnchant == typeof(Agreement))
+                CardCmd.Enchant(agreementCanonical.ToMutable(), card, 1m);
+            else
+                CardCmd.Enchant(doubtCanonical.ToMutable(), card, 1m);
         }
 
-        if (judgmentCards.Count > 0)
+        // 卡面：「选择获得3点【羁绊】，生成等量零费稀有【羁绊】牌」
+        // ⇒ 上面 3 次选择 = 3 点【羁绊】；再生成 3 张 0 费稀有羁绊牌放入抽牌堆。
+        for (int i = 0; i < 3; i++)
         {
-            var orderPrefs = new CardSelectorPrefs(SelectionScreenPrompt, judgmentCards.Count, judgmentCards.Count)
-            {
-                PretendCardsCanBePlayed = true
-            };
-            var orderedCards = await CardSelectCmd.FromSimpleGrid(
-                choiceContext, judgmentCards, owner, orderPrefs);
+            var rareBondCard = CreateRandomRareBondCard(combatState, owner, createCardMethod);
 
-            foreach (var card in orderedCards)
-            {
-                CardCmd.PreviewCardPileAdd(
-                    await CardPileCmd.AddGeneratedCardToCombat(card, PileType.Draw, owner, CardPilePosition.Random));
-            }
+            // 永久 0 费
+            if (!rareBondCard.EnergyCost.CostsX && rareBondCard.EnergyCost.Canonical > 0)
+                rareBondCard.EnergyCost.UpgradeBy(-rareBondCard.EnergyCost.Canonical);
+
+            CardCmd.PreviewCardPileAdd(
+                await CardPileCmd.AddGeneratedCardToCombat(rareBondCard, PileType.Draw, owner, CardPilePosition.Random));
         }
     }
 
-    private CardModel CreateRandomBondCard(ICombatState combatState, Player owner, MethodInfo createCardMethod)
-    {
-        var bondCardTypes = new[]
-        {
-            typeof(BalloonFragments),
-            typeof(StabbingBlade),
-            typeof(ShatteredResonance),
-            typeof(WitchCleansing),
-            typeof(ChainedTrust),
-            typeof(PawnRealization),
-            typeof(NoahEstrangement),
-            typeof(MargaretEstrangement),
-            typeof(CocoEstrangement),
-            typeof(AnnEstrangement),
-            typeof(Hiroshuyuancard),
-            typeof(Lyshuyuan),
-            typeof(SwapBodySuccess),
-            typeof(GuardianOath),
-            typeof(Sharedfate),
-            typeof(DollGift),
-            typeof(TheOnlyClue),
-            typeof(SubstituteCost),
-            typeof(NoahAffinity),
-            typeof(MargaretAffinity),
-            typeof(CocoAffinity),
-            typeof(AnnAffinity),
-            typeof(Lyqinjin),
-            typeof(BondSettlement),
-        };
+    /// <summary>卡面里的【羁绊】牌中，稀有度 Rare 的 6 张。</summary>
+    private static readonly Type[] RareBondCardTypes =
+    [
+        typeof(StabbingBlade),
+        typeof(NoahEstrangement),
+        typeof(SwapBodySuccess),
+        typeof(DollGift),
+        typeof(CocoAffinity),
+        typeof(BondSettlement),
+    ];
 
+    private CardModel CreateRandomRareBondCard(ICombatState combatState, Player owner, MethodInfo createCardMethod)
+    {
         var rng = owner.RunState.Rng.CombatCardSelection;
-        var chosenType = rng.NextItem(bondCardTypes);
+        var chosenType = rng.NextItem(RareBondCardTypes);
         var genericMethod = createCardMethod.MakeGenericMethod(chosenType);
         return (CardModel)genericMethod.Invoke(combatState, new object[] { owner });
     }

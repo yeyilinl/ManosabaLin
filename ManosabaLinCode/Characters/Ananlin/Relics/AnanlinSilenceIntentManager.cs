@@ -2,6 +2,7 @@ using System.Reflection;
 using HarmonyLib;
 using ManosabaLin.Characters.Ananlin.Cards;
 using ManosabaLin.Characters.Ananlin.Powers;
+using ManosabaLin.Characters.Common.LinRelics;
 using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Entities.Powers;
 using MegaCrit.Sts2.Core.MonsterMoves.Intents;
@@ -158,8 +159,13 @@ internal static class AnanlinSilenceIntentManager
         var targets = GetBrainwashTargets(owner);
         if (targets.Count == 0) return [];
 
-        // 洗脑：始终使用默认初始替换意图数值，不随缄默成长；但吃无声扩音（特殊卡写明：公共替换意图池倍率+1）
-        var selectedBuff = await ChoosePlayerBuffIntent(choiceContext, owner, 0, GetReplacementValueMultiplier(owner));
+        // 洗脑：默认使用初始替换意图数值（不随缄默成长）；但吃无声扩音（特殊卡写明：公共替换意图池倍率+1）。
+        // 【连线】海克斯「洗脑共鸣」：持有该遗物时，洗脑改为**读取【缄默】的可成长替换池**
+        // （即当前缄默成长值），与缄默共用同一池子。
+        // ⚠️ 用户（海克斯联动第 5 条）裁定：洗脑不仅读取、还**推进**同一个通用意图池 ——
+        // 与缄默一样，每次成功改写后让成长 +1（见下方 SilenceGrowthByPlayer[...] + 1）。
+        var baseBonus = HextechBrainwashResonance.IsActiveFor(owner) ? GetSilenceGrowth(owner) : 0;
+        var selectedBuff = await ChoosePlayerBuffIntent(choiceContext, owner, baseBonus, GetReplacementValueMultiplier(owner));
         if (selectedBuff is null) return [];
 
         if (beforeApply is not null && !await beforeApply())
@@ -177,6 +183,12 @@ internal static class AnanlinSilenceIntentManager
 
         MarkReplacementIntentUsed(owner, selectedBuff.Kind);
         RewritesThisCombatByPlayer[owner] = GetRewritesThisCombat(owner) + rewrittenTargets.Count;
+
+        // 【连线】海克斯「洗脑共鸣」：洗脑与缄默共用同一通用意图池，且洗脑也**推进**成长 +1
+        // （与缄默 TriggerAndGetTargets 末尾的 SilenceGrowthByPlayer[...] + 1 一致）。
+        if (HextechBrainwashResonance.IsActiveFor(owner))
+            SilenceGrowthByPlayer[owner] = GetSilenceGrowth(owner) + 1;
+
         if (owner.Creature.GetPower<AnanlinSealedPagePower>() is { } sealedPage)
             await sealedPage.AfterSilenceRightClickRewrite(choiceContext);
         RecordIntentRewrites(combatState, rewrittenTargets.Count);

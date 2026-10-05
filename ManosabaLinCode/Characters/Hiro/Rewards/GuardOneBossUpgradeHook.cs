@@ -8,6 +8,7 @@ using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Nodes.CommonUi;
+using MegaCrit.Sts2.Core.Nodes.Rooms;
 using MegaCrit.Sts2.Core.Rewards;
 using MegaCrit.Sts2.Core.Rooms;
 using STS2RitsuLib.Interop.AutoRegistration;
@@ -112,6 +113,20 @@ public sealed class GuardOneBossUpgradeHook : HookedSingletonModel
     /// </summary>
     private static bool ShouldOffer(RewardsSet rewards, CombatRoom room)
     {
+        // ⚠️ 读档恢复时不发（也不要弹屏）。
+        // 本奖励是靠「模态选卡屏」实现的，而"战斗已结束、只是重新进入这个房间"这条恢复路径是
+        // CombatRoom.EnterInternal → StartPreFinishedCombat → OfferRoomEndRewards，
+        // 它跑在整局读档的 await 链里，此时：
+        //   ① 画面已 FadeOut 到全黑（FadeIn 要等 EnterRoomInternal 返回之后才执行）；
+        //   ② 奖励屏还没出来（reward.Offer() 在 BeforeCombatRewardOffered 之后才被调用）。
+        // 在这里 await 选卡屏 = 把整次读档挂在黑屏上；玩家只能强退，
+        // 而强退会在取消过程中把房间恢复链打断，最终在 EnterRoomInternal 抛 NullReferenceException。
+        // 引擎用 CombatRoomMode.FinishedCombat 专门标记这种场景
+        // （"Used when loading a save after combat ended but before leaving the room"，
+        //  见 CombatRoomMode 与 CombatRoom.StartPreFinishedCombat），据此识别并跳过。
+        // 正常打完首领时房间节点是 ActiveCombat，不受影响。
+        if (NCombatRoom.Instance?.Mode == CombatRoomMode.FinishedCombat) return false;
+
         // 阵亡玩家不发：（原版 RewardsSet.Offer() 自己也会直接 return 跳过阵亡玩家，
         // 而钩子跑在 Offer() 之前、不带这道检查，所以这里必须自己补上，
         // 否则会出现「玩家已经死了却弹出升级选牌界面」。）

@@ -11,6 +11,8 @@ namespace ManosabaLin.Characters.Yalisalin.Capabilities;
 [RegisterDefaultModelCapability(typeof(Beforeforgiven))]
 [RegisterDefaultModelCapability(typeof(Glasshug))]
 [RegisterDefaultModelCapability(typeof(Stayingstillhurts))]
+[RegisterDefaultModelCapability(typeof(CombustionShared))]
+[RegisterDefaultModelCapability(typeof(EmberDividend))]
 public sealed class YalisalinFireComponentCapability : CardPlayCapability,
     ICardDescriptionContributor,
     ICardHoverTipContributor,

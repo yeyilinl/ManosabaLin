@@ -7,7 +7,7 @@ namespace ManosabaLin.Characters.Yalisalin.Cards;
 /// </summary>
 [RegisterCard(typeof(YalisalinCardPool))]
 public sealed class Pocketmatchbox()
-    : ManosabaCardTemplate(1, CardType.Skill, CardRarity.Uncommon, TargetType.AnyEnemy)
+    : ManosabaCardTemplate(0, CardType.Attack, CardRarity.Uncommon, TargetType.AnyEnemy)
 {
     protected override IEnumerable<DynamicVar> CanonicalVars => [new DamageVar(8, ValueProp.Move)];
 
@@ -23,7 +23,7 @@ public sealed class Pocketmatchbox()
         if (await hairpin.GiveFireColor(choiceContext, target, 1, this) <= 0 || before <= 0)
             return;
 
-        if (YalisalinsHairpin.SlotColor(before + 1) != YalisalinsHairpin.SlotColor(before) && target.IsAlive)
+        if (hairpin.SlotColorFor(before + 1) != hairpin.SlotColorFor(before) && target.IsAlive)
             await YalisalinFireColorCardHelpers.Attack(choiceContext, cardPlay, this, target, DynamicVars.Damage.BaseValue);
     }
 

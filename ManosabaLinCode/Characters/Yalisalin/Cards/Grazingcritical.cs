@@ -2,6 +2,10 @@ using ManosabaLin.Characters.Yalisalin.Relics;
 
 namespace ManosabaLin.Characters.Yalisalin.Cards;
 
+/// <summary>
+///     临界擦边：给予目标 2 格火色并获得能量；未升级时若目标因此满格，消耗 1 格火色；
+///     升级后改为「消耗 1 格火色然后再给予 1 格火色」。
+/// </summary>
 [RegisterCard(typeof(YalisalinCardPool))]
 public sealed class Grazingcritical()
     : ManosabaCardTemplate(1, CardType.Skill, CardRarity.Uncommon, TargetType.AnyEnemy)
@@ -16,12 +20,18 @@ public sealed class Grazingcritical()
         if (!YalisalinFireColorSystem.TryGetHairpin(Owner, out var hairpin))
             return;
 
-        var wasFull = hairpin.IsFireColorFull(target);
-        await hairpin.ConsumeFireColor(choiceContext, target, 1, this);
+        await hairpin.GiveFireColor(choiceContext, target, 2, this);
         await PlayerCmd.GainEnergy(DynamicVars.Energy.IntValue, Owner);
 
-        // 升级后去掉「因此不再满格」的条件
-        if (IsUpgraded || (wasFull && !hairpin.IsFireColorFull(target)))
+        if (IsUpgraded)
+        {
+            await hairpin.ConsumeFireColor(choiceContext, target, 1, this);
             await hairpin.GiveFireColor(choiceContext, target, 1, this);
+            return;
+        }
+
+        // 未升级：只有「给予后正好满格」才把多出来的那格烧掉。
+        if (hairpin.IsFireColorFull(target))
+            await hairpin.ConsumeFireColor(choiceContext, target, 1, this);
     }
 }

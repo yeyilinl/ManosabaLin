@@ -1,6 +1,8 @@
 using ManosabaLin.Characters.Common.LinRelics;
+using ManosabaLin.Characters.Ananlin;
 using ManosabaLin.Characters.Hiro;
 using ManosabaLin.Characters.Sherrylin;
+using ManosabaLin.Settings;
 using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Models;
 
@@ -45,7 +47,7 @@ internal static class HextechRuneCatalog
     public const string TagKey = "MANOSABA_LIN";
 
     /// <summary>
-    ///     全部 6 个符文的**海克斯品级**（**用户 2026-09-29 裁定：一律 Prismatic**）。
+    ///     我方全部符文的**海克斯品级**（**用户 2026-09-29 裁定：一律 Prismatic**）。
     ///     <para>
     ///         ⚠️ 这与我方遗物自己的 <c>RelicRarity.Starter</c> 是**两个维度**，不要混为一谈：
     ///     </para>
@@ -59,7 +61,7 @@ internal static class HextechRuneCatalog
     ///             掉率完全交给海克斯管理）⇒ **不能**改成别的；
     ///         </item>
     ///         <item>
-    ///             所以用户说的「六个都是棱彩品质」落下来就是**这里这个字符串**，且 6 条一致。
+    ///             所以用户说的「棱彩品质」落下来就是**这里这个字符串**，且所有条目一致。
     ///         </item>
     ///     </list>
     /// </summary>
@@ -77,13 +79,18 @@ internal static class HextechRuneCatalog
     /// <summary>
     ///     全部我方符文。
     ///     <para>
-    ///         ⚠️ <b>可用性过滤必须是确定性纯函数</b>：联机两端都会执行且必须得出相同结果，
+    ///         ⚠️ <b>可用性过滤必须是确定性纯函数（除全局开关外）</b>：联机两端都会执行且必须得出相同结果，
     ///         只允许读<b>同步状态</b>（<c>player.Character</c> / 遗物 / 牌组 / <c>RunState</c>），
-    ///         不要读本地设置、UI 或随机数。
+    ///         以及本模组的<b>全局</b>设置（<c>HextechLinkageSettingsService.IsEnabled</c>，默认开、两端默认一致）。
+    ///         不读本地 UI 或随机数。
     ///     </para>
     ///     <para>
     ///         我们用 <see cref="HextechRuneSpec.Availability" /> 而不是 <c>characterPool</c> 来按角色收窄，
     ///         因为对方枚举里<b>只有原版 5 个角色</b>，没有本 mod 的角色。
+    ///     </para>
+    ///     <para>
+    ///         门控语义 = <b>角色是安安/希罗/雪莉/艾玛，且全局联动开关未关</b>。用户的「专属联动遗物」门槛
+    ///         等价于角色门槛本身（像海克斯原版角色专属遗物那样，不硬查某个具体遗物），故只按角色判断 + 设置开关。
     ///     </para>
     /// </summary>
     public static IReadOnlyList<HextechRuneSpec> All { get; } =
@@ -97,7 +104,7 @@ internal static class HextechRuneCatalog
             0,
             TagKey,
             AssetModId,
-            static player => player.Character is Sherrylin,
+            static player => player.Character is Sherrylin && HextechLinkageSettingsService.IsEnabled,
             "雪莉琳专属：每回合可把四堆里任意张牌扔进弃牌堆"),
 
         // 2. 情绪球是雪莉琳专属机制 ⇒ 别的角色拿到是废牌。
@@ -109,7 +116,7 @@ internal static class HextechRuneCatalog
             0,
             TagKey,
             AssetModId,
-            static player => player.Character is Sherrylin,
+            static player => player.Character is Sherrylin && HextechLinkageSettingsService.IsEnabled,
             "雪莉琳专属：情绪球被挤出时立刻激发"),
 
         // 3. 用户裁定：仅雪莉琳（【魔女化】虽 5 个角色都有，但本遗物绑定的是雪莉琳那套组件链）。
@@ -121,7 +128,7 @@ internal static class HextechRuneCatalog
             0,
             TagKey,
             AssetModId,
-            static player => player.Character is Sherrylin,
+            static player => player.Character is Sherrylin && HextechLinkageSettingsService.IsEnabled,
             "雪莉琳专属：【魔女化】组件被激发时放大层数，回合开始把超量层数转成计数"),
 
         // 4 / 5 / 6. 【轮回】【伪证】【正义】都只存在于希罗的卡池（别的角色 0 处引用）。
@@ -133,7 +140,7 @@ internal static class HextechRuneCatalog
             0,
             TagKey,
             AssetModId,
-            static player => player.Character is Hiro,
+            static player => player.Character is Hiro && HextechLinkageSettingsService.IsEnabled,
             "希罗专属：打出【轮回】改为自动打出抽牌堆任意 2 张【轮回】"),
 
         new HextechRuneSpec(
@@ -144,7 +151,7 @@ internal static class HextechRuneCatalog
             0,
             TagKey,
             AssetModId,
-            static player => player.Character is Hiro,
+            static player => player.Character is Hiro && HextechLinkageSettingsService.IsEnabled,
             "希罗专属：能量不足时用【伪证】顶替，【正义】按 1:4 转换"),
 
         new HextechRuneSpec(
@@ -155,8 +162,76 @@ internal static class HextechRuneCatalog
             0,
             TagKey,
             AssetModId,
-            static player => player.Character is Hiro,
-            "希罗专属：回合结束把【再生】补到【正义】层数，【正义】不再回血")
+            static player => player.Character is Hiro && HextechLinkageSettingsService.IsEnabled,
+            "希罗专属：回合结束把【再生】补到【正义】层数，【正义】不再回血"),
+
+        // 7 / 8 / 9. 安安专属三件套（2026-09-29 追加）。书页 / 安心 / 缄默·洗脑 都只存在于安安的卡池与组件链。
+        new HextechRuneSpec(
+            typeof(HextechColorlessPage),
+            RuneRarity,
+            null,
+            null,
+            0,
+            TagKey,
+            AssetModId,
+            static player => player.Character is Ananlin && HextechLinkageSettingsService.IsEnabled,
+            "安安专属：书页额外多出一个可免费打出一次的无色选项"),
+
+        new HextechRuneSpec(
+            typeof(HextechPeaceOfMindEcho),
+            RuneRarity,
+            null,
+            null,
+            0,
+            TagKey,
+            AssetModId,
+            static player => player.Character is Ananlin && HextechLinkageSettingsService.IsEnabled,
+            "安安专属：【安心】按层数追加效果（攻击→活力／技能→格挡／能力→换留白书页并补回3层）"),
+
+        new HextechRuneSpec(
+            typeof(HextechBrainwashResonance),
+            RuneRarity,
+            null,
+            null,
+            0,
+            TagKey,
+            AssetModId,
+            static player => player.Character is Ananlin && HextechLinkageSettingsService.IsEnabled,
+            "安安专属：洗脑共用【缄默】的可成长替换池，且每场战斗第一次洗脑不获得【洗脑反噬】"),
+
+        // 10 / 11 / 12. 艾玛专属三件套（2026-10-01 追加）。魔女因子 / 审判附魔 / 亲近·疏远 都只存在于艾玛的机制链。
+        new HextechRuneSpec(
+            typeof(HextechWitchFactorErosion),
+            RuneRarity,
+            null,
+            null,
+            0,
+            TagKey,
+            AssetModId,
+            static player => player.Character is Emalin && HextechLinkageSettingsService.IsEnabled,
+            "艾玛专属：敌方回合开始时，带【魔女因子】的敌人按自身层数受到等量伤害"),
+
+        new HextechRuneSpec(
+            typeof(HextechTrialEmbodiment),
+            RuneRarity,
+            null,
+            null,
+            0,
+            TagKey,
+            AssetModId,
+            static player => player.Character is Emalin && HextechLinkageSettingsService.IsEnabled,
+            "艾玛专属：卡牌获得【审判】附魔时自动转换成同等效果的组件"),
+
+        new HextechRuneSpec(
+            typeof(HextechBondDrift),
+            RuneRarity,
+            null,
+            null,
+            0,
+            TagKey,
+            AssetModId,
+            static player => player.Character is Emalin && HextechLinkageSettingsService.IsEnabled,
+            "艾玛专属：亲近/疏远变化让模型左右漂移；左移给队友多人卡，右移移除一张并给下一次减费")
     ];
 
     /// <summary>

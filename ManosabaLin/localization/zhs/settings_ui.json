@@ -23,5 +23,9 @@
   "MANOSABALIN_TELEMETRY_DIAGNOSTICS": "诊断信息",
   "MANOSABALIN_TELEMETRY_RUNS": "历史记录",
   "MANOSABALIN_YESNO.yes": "是",
-  "MANOSABALIN_YESNO.no": "否"
+  "MANOSABALIN_YESNO.no": "否",
+  "MANOSABALIN_SETTINGS.hextech.section.title": "海克斯符文（联动）",
+  "MANOSABALIN_SETTINGS.hextech.section.description": "安装 Hextech Runes 模组时，控制 ManosabaLin 角色专属联动符文是否出现。",
+  "MANOSABALIN_SETTINGS.hextech.enabled.label": "启用海克斯联动符文",
+  "MANOSABALIN_SETTINGS.hextech.enabled.description": "启用后，安安/希罗/雪莉在每层选海克斯时可能获得本模组的专属联动符文。仅安装了 Hextech Runes 时生效。"
 }

@@ -4,7 +4,7 @@ namespace ManosabaLin.Characters.Yalisalin.Cards;
 
 /// <summary>
 ///     被原谅的体温（2 费 技能・稀有）：
-///     回复 4 点生命，本回合每有 1 次「宽恕」额外回复 1 点生命。
+///     回复 4 点生命，本回合每有 1 次「自惩」额外回复 1 点生命。
 ///     升级后费用降为 1 费。
 /// </summary>
 [RegisterCard(typeof(YalisalinCardPool))]
@@ -21,8 +21,9 @@ public sealed class WarmthOfForgiveness()
         if (Owner is not { } owner)
             return;
 
+        // 卡面写的是「本回合每有 1 次『自惩』」，读的是自惩计数（不是宽恕）。
         var extra = YalisalinFireColorSystem.TryGetHairpin(owner, out var hairpin)
-            ? hairpin.SinForgiveThisTurn
+            ? hairpin.SinPunishThisTurn
             : 0;
 
         await CreatureCmd.Heal(owner.Creature, DynamicVars["Heal"].BaseValue + extra);

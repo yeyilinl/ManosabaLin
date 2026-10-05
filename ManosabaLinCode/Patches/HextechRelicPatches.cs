@@ -54,12 +54,19 @@ internal static class HextechOrbOverflowPatch
                 MainFile.Logger.Warn($"[HextechEmotionOverflow] orb leave anim failed: {ex.Message}");
             }
 
-            HangingEmotionOrbs.Hang(player, front);
-            return;
-        }
+        HangingEmotionOrbs.Hang(player, front);
+        return;
+    }
 
+    // 只有「有溢出结算」的情绪球才记账；其余（非情绪球 / 魔女化球 / 无遗物时的持续型球）正常挤出，
+    // 不占用标记 —— 避免标记被无关球消费或残留，导致新球被误判成「被挤出」（吞卡）。
+    if (front is IEmotionOrb payoutEmotion
+        && HextechEmotionOverflow.IsActiveFor(player)
+        && EmotionOverflowRules.HasOverflowPayout(payoutEmotion.GetEmotionCard()))
+    {
         HextechOrbEvokeRules.MarkSqueezedOut(front);
     }
+}
 }
 
 // 联动遗物 4：把「打出轮回卡」的结算整体换成「抽牌堆里任意两张轮回卡」。

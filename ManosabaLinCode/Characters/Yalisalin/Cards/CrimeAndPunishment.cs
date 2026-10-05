@@ -12,7 +12,7 @@ namespace ManosabaLin.Characters.Yalisalin.Cards;
 /// </summary>
 [RegisterCard(typeof(YalisalinCardPool))]
 public sealed class CrimeAndPunishment()
-    : ManosabaCardTemplate(2, CardType.Attack, CardRarity.Rare, TargetType.Self)
+    : ManosabaCardTemplate(3, CardType.Attack, CardRarity.Rare, TargetType.Self)
 {
     private const int BaseHealPerForgive = 2;
 

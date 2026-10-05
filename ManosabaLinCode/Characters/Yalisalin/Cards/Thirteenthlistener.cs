@@ -12,7 +12,7 @@ public sealed class Thirteenthlistener()
 {
     protected override async Task OnPlay(PlayerChoiceContext choiceContext, CardPlay cardPlay, ComponentContext componentContext)
     {
-        // 每当触发火色连续，额外消耗 1 格并抽 1 张，逻辑在能力里
+        // 每当触发火色连续，先给予同一名敌人 1 格火色，再消耗 1 格并抽 1 张，逻辑在能力里
         await PowerCmd.Apply<ThirteenthListenerPower>(choiceContext, Owner.Creature, 1m, Owner.Creature, this, false);
     }
 

@@ -55,9 +55,11 @@ public sealed class JusticeEnforcer() : ManosabaCardTemplate(3, CardType.Power, 
                 .Where(c => c.Type != CardType.Status && c.Type != CardType.Curse)
                 .ToList();
 
+            // 卡面：「失去本卡记载资源」⇒【轮回】牌就是本卡记载资源，手牌里全部消耗；
+            //        「手牌每有1张【轮回】牌就生成1张【轮回】牌并回复1点生命」。
             foreach (var card in rebirthCards)
             {
-                await CardPileCmd.Add(card, (PileType)4, (CardPilePosition)1, null, false);
+                await CardCmd.Exhaust(choiceContext, card);
 
                 if (pool.Count > 0)
                 {
@@ -67,7 +69,6 @@ public sealed class JusticeEnforcer() : ManosabaCardTemplate(3, CardType.Power, 
                     await CardPileCmd.AddGeneratedCardToCombat(generated, PileType.Hand, owner, CardPilePosition.Bottom);
                 }
 
-                await PowerCmd.Apply<PerjuryPower>(choiceContext, owner.Creature, 1, owner.Creature, source, false);
                 await CreatureCmd.Heal(owner.Creature, 1);
             }
         }
@@ -89,7 +90,8 @@ public sealed class JusticeEnforcer() : ManosabaCardTemplate(3, CardType.Power, 
                 var rng = owner.RunState.Rng.CombatTargets;
                 for (var i = 0; i < perjuryAmt; i++)
                 {
-                    await CreatureCmd.Damage(choiceContext, rng.NextItem(enemies) ?? enemies[0], 2 + (int)(withAmt / 50), ValueProp.Unpowered, null, null);
+                    // 卡面：「每层【伪证】对随机敌人造成2+【魔女化】一半的伤害」
+                    await CreatureCmd.Damage(choiceContext, rng.NextItem(enemies) ?? enemies[0], 2 + (int)(withAmt / 2), ValueProp.Unpowered, null, null);
                 }
             }
             await PowerCmd.Apply<JusticePower>(choiceContext, owner.Creature, perjuryAmt, owner.Creature, source, false);
@@ -98,16 +100,20 @@ public sealed class JusticeEnforcer() : ManosabaCardTemplate(3, CardType.Power, 
 
         if (suspectAmt > 0)
         {
-            // 重新获取确保一致性
+            // 卡面：「每层【嫌疑】回复1点能量」（不再折算成【魔女化】）
             var suspectToRemove = owner.Creature.GetPower<SuspectPower>();
             if (suspectToRemove != null)
             {
                 var amount = suspectToRemove.Amount;
-                await PowerCmd.Apply<WithPower>(choiceContext, owner.Creature, amount * 20, owner.Creature, source, false);
                 await PlayerCmd.GainEnergy(amount, owner);
                 await PowerCmd.Remove(suspectToRemove);
             }
         }
+
+        // 卡面：「按照【正义】层数全体回血」⇒【正义】同样是本卡记载资源，
+        //        层数需含本段刚由【伪证】转换而来的部分，结算完（全体回血）后全部失去。
+        justice = owner.Creature.GetPower<JusticePower>();
+        justiceAmt = justice?.Amount ?? 0;
 
         if (justiceAmt > 0)
         {
@@ -117,21 +123,23 @@ public sealed class JusticeEnforcer() : ManosabaCardTemplate(3, CardType.Power, 
 
             foreach (var ally in allies)
                 await CreatureCmd.Heal(ally, justiceAmt);
-
-            handCards = PileType.Hand.GetPile(owner).Cards.Where(c => c != source).ToList();
-            if (justiceAmt >= 10)
-            {
-                foreach (var card in handCards)
-                    card.AddModKeyword(TransmigrationRules.TransmigrationCardKeyword);
-            }
         }
 
-        if (withAmt >= 100)
+        justice = owner.Creature.GetPower<JusticePower>();
+        if (justice != null)
+            await PowerCmd.Remove(justice);
+
+        // 卡面：「若失去【魔女化】大于100，获得1层【原罪】」
+        // ⇒ 先失去全部【魔女化】（失去本卡记载资源），再看失去量是否大于 100。
+        if (withAmt > 100)
         {
             await PowerCmd.Apply<OriginalsinjusticePower>(
                 choiceContext, owner.Creature, 1, owner.Creature, source, false
             );
         }
+
+        if (with != null)
+            await PowerCmd.Remove(with);
     }
 
     protected override void OnUpgrade(ComponentContext componentContext)

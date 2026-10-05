@@ -17,7 +17,7 @@ public sealed class Hiroparanoid : LinAncientCurseCard
 {
 
     // 偏执属于特殊先古诅咒卡：1 费、可打出（覆盖基类的默认"无法打出"）。
-    public Hiroparanoid() : base(1, TargetType.Self) { }
+    public Hiroparanoid() : base(-1, TargetType.Self) { }
 
     public override int MaxUpgradeLevel => 0;
 

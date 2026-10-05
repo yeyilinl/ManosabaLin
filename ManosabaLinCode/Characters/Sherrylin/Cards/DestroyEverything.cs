@@ -20,12 +20,6 @@ namespace ManosabaLin.Characters.Sherrylin.Cards;
 [RegisterCard(typeof(SherrylinCardPool))]
 public sealed class DestroyEverything() : ManosabaCardTemplate(3, CardType.Attack, CardRarity.Rare, TargetType.AnyEnemy)
 {
-    private static readonly HashSet<System.Type> ComplexEmotions =
-    [
-        typeof(EmotionMelancholy), typeof(EmotionIrritatedFear), typeof(EmotionDesolate),
-        typeof(EmotionHorrorDisgust), typeof(EmotionElation)
-    ];
-
     protected override IEnumerable<ICardComponent> CanonicalComponents =>
         [new Common.Components.Abstracts.Sherryyuanzui()];
     protected override IEnumerable<DynamicVar> CanonicalVars =>
@@ -93,27 +87,11 @@ public sealed class DestroyEverything() : ManosabaCardTemplate(3, CardType.Attac
         {
             await CardCmd.Exhaust(choiceContext, card);
 
-            bool isComplex = ComplexEmotions.Contains(card.GetType());
-
-            if (isComplex)
+            // 卡面：「每失去【他人的情绪】中1张牌（最多4张）就使所有敌人受到8点伤害」
+            foreach (var enemy in CombatState.Enemies.Where(e => e.IsAlive))
             {
-                foreach (var enemy in CombatState.Enemies.Where(e => e.IsAlive))
-                {
-                    await CreatureCmd.Damage(choiceContext, enemy, source.DynamicVars["PerExhaust"].IntValue, ValueProp.Unpowered, source, cardPlay);
-                }
+                await CreatureCmd.Damage(choiceContext, enemy, source.DynamicVars["PerExhaust"].IntValue, ValueProp.Unpowered, source, cardPlay);
             }
-            else
-            {
-                var enemies = CombatState.Enemies.Where(e => e.IsAlive).ToList();
-                if (enemies.Count > 0)
-                {
-                    var rng = source.Owner.RunState.Rng.CombatCardSelection;
-                    var target = enemies[rng.NextInt(enemies.Count)];
-                    await CreatureCmd.Damage(choiceContext, target, source.DynamicVars["PerExhaust"].IntValue, ValueProp.Unpowered, source, cardPlay);
-                }
-            }
-
-            await CreatureCmd.Damage(choiceContext, Owner.Creature, 1m, ValueProp.Unblockable | ValueProp.Unpowered, source, null);
         }
 
         // === 毁灭等待 ===
@@ -149,27 +127,8 @@ public sealed class DestroyEverything() : ManosabaCardTemplate(3, CardType.Attac
                 var template = rng.NextItem(pool);
                 var newCard = CombatState.CreateCard(template, Owner);
                 newCard.EnergyCost.UpgradeBy(-1);
-                await CardPileCmd.AddGeneratedCardToCombat(newCard, PileType.Hand, Owner);
+                    await CardPileCmd.AddGeneratedCardToCombat(newCard, PileType.Hand, Owner);
             }
-        }
-
-        if (totalCounterReset >= 13)
-        {
-            await TriggerCaseReversal();
-
-            var rng = Owner.RunState.Rng.CombatCardSelection;
-            CardModel extraCard;
-            if (rng.NextInt(2) == 0)
-                extraCard = CombatState.CreateCard<EmotionHelplessness>(Owner);
-            else
-                extraCard = CombatState.CreateCard<EmotionCuriosity>(Owner);
-
-            if (extraCard != null)
-                await CaseFilePileHelper.AddToCaseFilePile(
-                    extraCard, Owner, CardPilePosition.Top, choiceContext);
-            var maxEnergy = Owner.MaxEnergy;
-            var currentEnergy = Owner.PlayerCombatState?.Energy ?? 0;
-            await PlayerCmd.GainEnergy(maxEnergy - currentEnergy, Owner);
         }
     }
 

@@ -19,8 +19,9 @@ using ManosabaLin.Characters.Common.Components;
 
 namespace ManosabaLin.Characters.Sherrylin.Cards.Emotions;
 
-[RegisterCard(typeof(SherrylinCardPool))]
-public sealed class EmotionHelplessness() : CaseFileCard<EmotionHelplessnessOrb>(1, CardRarity.Ancient, TargetType.AnyEnemy)
+[RegisterCard(typeof(LinCardPool))]
+// 图鉴可见（第 4 参 = shouldShowInCardLibrary；基类默认 false）。
+public sealed class EmotionHelplessness() : CaseFileCard<EmotionHelplessnessOrb>(1, CardRarity.Ancient, TargetType.AnyEnemy, true)
 {
     public override int MaxUpgradeLevel => 0;
 

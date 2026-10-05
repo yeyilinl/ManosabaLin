@@ -70,13 +70,6 @@ public sealed class AnanlinYujiaoBeanSproutMineGirl()
         HoverTipFactory.FromCard<AnanlinBombDisposalExpert>()
     ];
 
-    protected override CardLocation GetResultLocationForCardPlayC()
-    {
-        return IsComplete
-            ? new CardLocation(Owner, PileType.Exhaust, CardPilePosition.Bottom)
-            : base.GetResultLocationForCardPlayC();
-    }
-
     protected override async Task AfterPlayerTurnStart(
         PlayerChoiceContext choiceContext,
         Player player,
@@ -99,8 +92,12 @@ public sealed class AnanlinYujiaoBeanSproutMineGirl()
         await CardPileCmd.Draw(choiceContext, BaseDraw, Owner);
         await this.AddMarginPageToHand(false);
 
+        // 记录完成：本地化为「打出后移除」——照子弹卡做法直接移出战斗（不是进消耗堆）。
         if (IsComplete)
+        {
             await CreateBombDisposalExpert();
+            await CardPileCmd.RemoveFromCombat(this);
+        }
     }
 
     protected override async Task AfterSideTurnEnd(

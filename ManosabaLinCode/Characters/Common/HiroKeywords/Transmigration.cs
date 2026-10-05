@@ -45,8 +45,10 @@ public static class TransmigrationRules
 
         // 抽牌堆中的同名轮回卡（原有逻辑）
         // 同一处痕迹：本次打出时刚加入抽牌堆的副本不能立刻被轮回触发，只触发原本就在抽牌堆的卡
+        // ⭐ 2026-10-02：「同名」判据由「同 Id」放宽为 CardRename.SameName（同 Id 或同卡名）——
+        //     卡面「宿命的轮替」升级后会把两张卡的卡名改成一致，必须按**卡名**才认得出它们是一对。
         var matching = drawPile.Cards
-            .Where(c => c.Id == source.Id && c != source && HasTransmigration(c)
+            .Where(c => c != source && HasTransmigration(c) && CardRename.SameName(c, source)
                         && !(c is SamePlaceTrace { JustAddedToDrawPile: true }))
             .Take(MaxCopiesToPlay)
             .ToList();
@@ -55,7 +57,7 @@ public static class TransmigrationRules
         if (matching.Count < MaxCopiesToPlay)
         {
             var fromDiscard = discardPile.Cards
-                .Where(c => c.Id == source.Id && c != source && HasTransmigration(c)
+                .Where(c => c != source && HasTransmigration(c) && CardRename.SameName(c, source)
                             && c.TryGetCapability<TruthComponentCapability>(out _))
                 .Take(MaxCopiesToPlay - matching.Count);
 

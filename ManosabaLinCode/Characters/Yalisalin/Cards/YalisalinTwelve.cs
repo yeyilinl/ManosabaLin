@@ -7,13 +7,14 @@ using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.GameActions.Multiplayer;
 using MegaCrit.Sts2.Core.HoverTips;
+using ManosabaLin.Characters.Yalisalin.Powers;
 using MegaCrit.Sts2.Core.Localization.DynamicVars;
 using STS2RitsuLib.Interop.AutoRegistration;
 
 namespace ManosabaLin.Characters.Yalisalin.Cards;
 
 [RegisterCard(typeof(YalisalinCardPool))]
-public sealed class YalisalinTwelve() : ManosabaCardTemplate(0, CardType.Skill, CardRarity.Rare, TargetType.AnyPlayer)
+public sealed class YalisalinTwelve() : ManosabaCardTemplate(1, CardType.Attack, CardRarity.Rare, TargetType.AnyPlayer)
 {
     private const int RequiredSuspectAmount = 2;
 
@@ -30,32 +31,17 @@ public sealed class YalisalinTwelve() : ManosabaCardTemplate(0, CardType.Skill, 
         get
         {
             yield return HoverTipFactory.FromPower<SuspectPower>();
-            yield return HoverTipFactory.FromPower<YlsmPower>();
+            yield return HoverTipFactory.FromPower<IgnitePower>();
         }
     }
 
     protected override async Task OnPlay(PlayerChoiceContext choiceContext, CardPlay cardPlay, ComponentContext componentContext)
     {
         var source = this;
-        var target = cardPlay.Target ?? source.Owner.Creature;
 
         await CreatureCmd.TriggerAnim(source.Owner.Creature, "Cast", source.Owner.Character.CastAnimDelay);
 
-        // 消耗目标的嫌疑
-        var targetSuspectPower = target.GetPower<SuspectPower>();
-        if (targetSuspectPower != null && targetSuspectPower.Amount > 0)
-        {
-            var consumeAmount = Math.Min(targetSuspectPower.Amount, source.DynamicVars["ConsumeAmount"].IntValue);
-            await PowerCmd.ModifyAmount(
-                choiceContext, targetSuspectPower,
-                -consumeAmount,
-                target,
-                source,
-                false
-            );
-        }
-
-        // 给自己施加嫌疑
+        // 获得【嫌疑】
         await PowerCmd.Apply<SuspectPower>(
             choiceContext, source.Owner.Creature,
             source.DynamicVars["SuspectPower"].BaseValue,
@@ -64,17 +50,9 @@ public sealed class YalisalinTwelve() : ManosabaCardTemplate(0, CardType.Skill, 
             false
         );
 
-        // 给目标能量
-        await PlayerCmd.GainEnergy(
-            source.DynamicVars.Energy.IntValue,
-            target.Player
-        );
-
-        // 给自己 YlsmPower
-        await PowerCmd.Apply<YlsmPower>(
-            choiceContext, source.Owner.Creature, source.DynamicVars["YlsmPower"].BaseValue,
-            source.Owner.Creature, source, false
-        );
+        // 立刻触发 1 次【点火】的回合结束效果
+        if (source.Owner.Creature.GetPower<IgnitePower>() is { } ignite)
+            await ignite.TriggerIgnite(choiceContext);
     }
 
     protected override void OnUpgrade(ComponentContext componentContext)

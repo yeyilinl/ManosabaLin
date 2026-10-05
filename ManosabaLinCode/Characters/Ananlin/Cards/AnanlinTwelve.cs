@@ -10,7 +10,7 @@ using MegaCrit.Sts2.Core.HoverTips;
 using MegaCrit.Sts2.Core.Localization.DynamicVars;
 using STS2RitsuLib.Interop.AutoRegistration;
 
-namespace ManosabaLin.Characters.Hiro.Cards;
+namespace ManosabaLin.Characters.Ananlin.Cards;
 
 [RegisterCard(typeof(AnanlinCardPool))]
 public sealed class AnanlinTwelve() : ManosabaCardTemplate(0, CardType.Skill, CardRarity.Uncommon, TargetType.AnyPlayer)

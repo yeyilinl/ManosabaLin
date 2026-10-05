@@ -4,7 +4,7 @@ namespace ManosabaLin.Characters.Ananlin.Cards;
 
 [RegisterCard(typeof(AnanlinCardPool))]
 public sealed class AnanlinConfirmDoorGap()
-    : ManosabaCardTemplate(2, CardType.Skill, CardRarity.Uncommon, TargetType.Self),
+    : ManosabaCardTemplate(1, CardType.Skill, CardRarity.Uncommon, TargetType.Self),
         IAnanlinPeaceOfMindSpecialCard
 {
     protected override IEnumerable<DynamicVar> CanonicalVars =>
@@ -49,6 +49,7 @@ public sealed class AnanlinConfirmDoorGap()
 
     protected override void OnUpgrade(ComponentContext componentContext)
     {
-        EnergyCost.UpgradeBy(-1);
+        // 升级：该牌打出时额外获得的格挡 2 → 4（不再减费）。
+        DynamicVars.Block.UpgradeValueBy(2m);
     }
 }

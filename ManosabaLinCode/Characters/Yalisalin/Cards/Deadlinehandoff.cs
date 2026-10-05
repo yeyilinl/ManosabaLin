@@ -8,7 +8,7 @@ namespace ManosabaLin.Characters.Yalisalin.Cards;
 /// </summary>
 [RegisterCard(typeof(YalisalinCardPool))]
 public sealed class Deadlinehandoff()
-    : ManosabaCardTemplate(2, CardType.Skill, CardRarity.Rare, TargetType.AnyEnemy)
+    : ManosabaCardTemplate(2, CardType.Attack, CardRarity.Rare, TargetType.AnyEnemy)
 {
     protected override IEnumerable<DynamicVar> CanonicalVars =>
     [

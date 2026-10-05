@@ -97,12 +97,17 @@ public sealed class Xueqinjincard1 : ManosabaCardTemplate
         if (genericMethod.Invoke(combatState, [owner]) is not CardModel estrangementCard) return;
 
         estrangementCard.AddKeyword(CardKeyword.Retain);
+
+        // 升级后：变化出的那张【疏远】牌也是升级版（本地化 {IfUpgraded:show:升级后的|}）。
+        if (IsUpgraded)
+            CardCmd.Upgrade(estrangementCard);
+
         await CardCmd.Transform(picked, estrangementCard);
     }
 
     protected override void OnUpgrade(ComponentContext componentContext)
     {
-        EnergyCost.UpgradeBy(-1);
+        // 升级不再减费：升级收益是「变化出的【疏远】牌为升级版」（见 OnPlay）。
     }
 
     protected override CardLocation GetResultLocationForCardPlayC()

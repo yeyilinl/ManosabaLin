@@ -161,3 +161,66 @@ public static bool IsHextechOwnedRelic(RelicModel? relic)
 > `BuildModelIdLookupCache()` already computes the ModelId sets, a public
 > `IsHextechOwnedRelic(RelicModel)` built on them would keep the "external runes never leak into the
 > vanilla natural relic pool" guarantee even for third parties that don't use `RelicRarity.Starter`.
+
+---
+
+## R4 【需求】「每幕必出一个角色专属联动符文」的公开能力
+
+> **2026-10-01 追加**（我方用户点名的功能，见下）。此条与 R1/R2/R3 不同：**没有公开能力就做不了**，
+> 我们绝不会 patch 贵方的 `internal` 类（指南红线）。
+
+**需求**（用户原话转述）：我方符文已按角色收窄（雪莉琳 3 / 希罗 3 / 安安 3，用 `isAvailableForPlayer` 过滤）。
+用户希望——**当前角色是本 mod 角色、且该角色有专属联动符文、且玩家未在设置里关闭时，每幕第一次选海克斯时，
+三选一里【必定】有一个该角色的专属符文（无视本幕掷出的稀有度直接出现）**；没有专属符文则跳过；
+玩家把它刷新掉之后，按正常海克斯规则刷新。
+
+**现状（我方已深读 `HextechRuneSelectionCoordinator.Core.cs` / `.Selection.cs` / `HextechRunePoolBuilder.cs`）**：
+
+- 候选生成链：`HandleStageSelection → ResolveActRoll(先掷稀有度) → RunStagePlayerSelectionsAsync →
+  SelectSinglePlayerRuneAsync → BuildSelectableRunesForRarity → BuildSelectableRunePool → PickWeightedDistinct(加权不放回抽 3)
+  → HextechRuneGeneration.Transform(仅 Mayhem)`。
+- **没有「必出/保底槽」的公开插入点**：
+  - `isAvailableForPlayer` 只是过滤（能排除、不能强制出现）；
+  - `tagKey` / `characterWeightPercent` 只是**加权**，不是**必定**；
+  - `RegisterChaosTransform` 是唯一能改候选的公开钩子，但**只在 `HextechMayhemModifier.IsModActiveForRun` 且
+    `ChaosRuneChancePercent > 0` 时执行**（普通模式不跑），且 `TryAcceptTransformResult` 要求返回候选满足
+    `HextechCatalog.IsHextechRelic(relic)` ⇒ **外部符文（不继承 `HextechRelicBase` 的 `RelicModel` 子类）会被直接拒绝**，
+    这条钩子对外部符文完全不可用。
+- 选择协调器是 `internal`，`SelectRune` / `SelectSinglePlayerRuneAsync` 都是 `private`。
+
+**建议（任一即可，按改动量从小到大）**：
+
+- **A（最小，推荐）**：给 `HextechRunesInterop` 新增「保底符文提供者」注册（`ApiVersion` → 2）：
+  ```csharp
+  // 返回 null 表示本幕没有保底；返回的符文必须是已登记的玩家符文（含外部符文）。
+  public static void RegisterGuaranteedPlayerRune(Func<Player, RelicModel?> provider);
+  ```
+  语义：`PickWeightedDistinct` 抽满 3 个候选后，若 `provider(player)` 返回一个**可合法发放**的符文
+  （已登记、本幕允许、角色可用、未被拥有/互斥/禁用排除），则用它顶掉第 1 个槽位（其余 2 个照常抽）；
+  返回 null 或该符文不可合法发放时按现有规则抽满 3 个。刷新走现有重随逻辑，不额外特殊处理。
+
+- **B（更贴合元数据驱动）**：给 `RegisterPlayerRune` 新增一个 `flags` 位（如 `GuaranteedFirstPick`），
+  表示该符文在「当前角色可用且未被禁用」时，每幕第一次选择**必定**进入三选一。需要贵方在候选生成链里
+  加一个「保底候选」判定点。
+
+- **C（最通用）**：开放一个「候选后处理」公开钩子（类似 `RegisterChaosTransform`，但**不要求 Mayhem、
+  也不要求 `IsHextechRelic`**，只要求返回候选是**已登记的玩家符文**——把 `TryAcceptTransformResult` 里
+  `IsHextechRelic` 换成 `TryGetPlayerRuneRarityById`），并在**每次三选一生成后**调用。保底与将来其它
+  「候选改写」需求都能复用同一条钩子。
+
+> 若近期不排此需求，请告知，我们好在界面上做个「此功能不可用」的降级说明。
+
+### R4 English abstract
+
+> **Feature request.** We register character-exclusive runes via `isAvailableForPlayer` (3 for our
+> Sherrylin, 3 for Hiro, 3 for Ananlin). Our user wants a **guaranteed** slot: at each act's first rune
+> selection, if the current character is one of ours and has a rune the player hasn't disabled, one of the
+> three options must **always** be that character's rune (ignoring the rolled rarity); if none, skip; after a
+> reroll, fall back to normal rules.
+>
+> There is currently no public hook for this: `isAvailableForPlayer` only filters, `tagKey` /
+> `characterWeightPercent` only bias, and `RegisterChaosTransform` runs only under `HextechMayhemModifier`
+> with `ChaosRuneChancePercent > 0` **and** rejects external runes via `IsHextechRelic`. Please expose one
+> of: (A) `RegisterGuaranteedPlayerRune(Func<Player, RelicModel?>)`, or (B) a `GuaranteedFirstPick` flag on
+> `RegisterPlayerRune`, or (C) a candidate post-process hook that accepts any *registered* player rune
+> (swap `IsHextechRelic` → `TryGetPlayerRuneRarityById`). We will not patch your `internal` selection code.

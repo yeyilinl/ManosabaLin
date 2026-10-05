@@ -1,4 +1,5 @@
 using System.Reflection;
+using STS2RitsuLib;
 
 namespace ManosabaLin.Compat.Hextech;
 
@@ -23,6 +24,16 @@ namespace ManosabaLin.Compat.Hextech;
 ///         缺能力就开 issue（草稿见 <c>docs/hextech-compat-hextech.md</c>）。
 ///     </para>
 /// </summary>
+/// <remarks>
+///     <para>
+///         <b>为什么还有「兜底重试」</b>：对方的实现分两层 —— <c>HextechRunes.Loader</c>（一个独立的
+///         <c>[ModInitializer]</c>）在**自己的初始化方法里**才去 <c>LoadFromAssemblyPath</c> 真正的
+///         <c>HextechRunes.dll</c> 并调用它的 <c>ModEntry.Initialize()</c>。
+///         ⇒ 若本模组的初始化跑在 loader 之前，<see cref="AppDomain.AssemblyLoad" /> 会在
+///         <c>LoadFromAssemblyPath</c> 那一刻（= 对方 <c>ModEntry.Initialize()</c> **之前**）触发。
+///         单靠事件因此**不是一个确定的安全点**。见 <see cref="SubscribeLateSweeps" />。
+///     </para>
+/// </remarks>
 internal static class HextechCompat
 {
     /// <summary>按<b>程序集名</b>检测，不是 manifest id。</summary>
@@ -40,10 +51,10 @@ internal static class HextechCompat
     private static readonly object Gate = new();
 
     private static bool _listening;
-    private static bool _bindAttempted;
+    private static bool _lateSweepsSubscribed;
 
     /// <summary>已绑定的海克斯程序集；未装为 <c>null</c>。</summary>
-    public static System.Reflection.Assembly? TargetAssembly { get; private set; }
+    public static Assembly? TargetAssembly { get; private set; }
 
     /// <summary>已绑定的 <c>HextechRunesInterop</c> 类型；解析失败为 <c>null</c>。</summary>
     public static Type? InteropType { get; private set; }
@@ -58,6 +69,7 @@ internal static class HextechCompat
     /// <summary>
     ///     在 <c>MainFile.Initialize()</c> 里调用一次。
     ///     已加载 ⇒ 立即绑定并注册；未加载 ⇒ 订阅 <see cref="AppDomain.AssemblyLoad" /> 等它。
+    ///     两条路都会再挂上 <see cref="SubscribeLateSweeps" /> 的兜底重试。
     /// </summary>
     public static void Initialize()
     {
@@ -66,26 +78,31 @@ internal static class HextechCompat
             var loaded = FindLoadedAssembly();
             if (loaded is not null)
             {
-                Bind(loaded);
-                return;
+                TryBind(loaded);
             }
-
-            lock (Gate)
+            else
             {
-                if (_listening || _bindAttempted) return;
-                _listening = true;
-                AppDomain.CurrentDomain.AssemblyLoad += OnAssemblyLoad;
-            }
+                lock (Gate)
+                {
+                    if (!_listening)
+                    {
+                        _listening = true;
+                        AppDomain.CurrentDomain.AssemblyLoad += OnAssemblyLoad;
+                    }
+                }
 
-            Info($"assembly '{AssemblyName}' not loaded yet; waiting for AssemblyLoad.");
+                Info($"assembly '{AssemblyName}' not loaded yet; waiting for AssemblyLoad (+ late sweeps).");
+            }
         }
         catch (Exception ex)
         {
             Warn($"Initialize failed: {ex.Message}");
         }
+
+        SubscribeLateSweeps();
     }
 
-    private static System.Reflection.Assembly? FindLoadedAssembly()
+    private static Assembly? FindLoadedAssembly()
     {
         foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
         {
@@ -110,7 +127,7 @@ internal static class HextechCompat
             }
 
             Info("assembly loaded late; registering now.");
-            Bind(e.LoadedAssembly);
+            TryBind(e.LoadedAssembly);
         }
         catch (Exception ex)
         {
@@ -118,21 +135,26 @@ internal static class HextechCompat
         }
     }
 
-    /// <summary>绑定程序集 + 读 <c>ApiVersion</c>；只在拿到可用版本后才去注册。</summary>
-    private static void Bind(System.Reflection.Assembly assembly)
+    /// <summary>
+    ///     绑定程序集 + 读 <c>ApiVersion</c>；只在拿到可用版本后才去注册。
+    ///     <para>
+    ///         ⚠️ <b>幂等且可重入</b>：已经绑定并且目录里的符文**全部**登记成功时直接返回；
+    ///         否则允许再试一次（<see cref="RunLateSweep" /> 会带着同一个程序集再调进来）。
+    ///     </para>
+    /// </summary>
+    private static void TryBind(Assembly assembly)
     {
         Type? interopType;
 
         lock (Gate)
         {
-            if (_bindAttempted) return;
-            _bindAttempted = true;
+            TargetAssembly ??= assembly;
 
-            TargetAssembly = assembly;
+            // 已完成（绑定成功 + 9 个符文全部登记）⇒ 不再重复解析/重复注册。
+            if (IsReady && HextechRuneRegistrar.AllRegistered) return;
+
             ApiVersion = 0;
-
-            interopType = assembly.GetType(InteropTypeName, throwOnError: false);
-            InteropType = interopType;
+            InteropType = interopType = assembly.GetType(InteropTypeName, throwOnError: false);
 
             if (interopType is null)
             {
@@ -159,6 +181,71 @@ internal static class HextechCompat
         HextechRuneRegistrar.RegisterAll();
     }
 
+    /// <summary>
+    ///     兜底重试：在 <c>GameReady</c> 与 <c>MainMenuReady</c> 两个生命周期点各再尝试一次绑定 + 注册。
+    ///     <para>
+    ///         这两个点**一定晚于所有模组的初始化**（对方的程序集若装了，此时必定已加载，
+    ///         且它自己的 <c>ModEntry.Initialize()</c> 已经跑完），又**早于任何跑局的遗物池首次枚举**
+    ///         —— 而注册窗口（<c>ModHelper</c> 的池冻结 / <c>ModelIdSerializationCache.Init</c>）
+    ///         正是在那之后才真正关闭。也就是说这是「窗口还开着、对方也准备好了」的最后一个安全时刻。
+    ///     </para>
+    ///     <para>
+    ///         因此它兜住「注册窗口关闭 ⇒ 9 个符文静默少注册」的三条路径：
+    ///         ① 对方程序集加载时我们还**没订阅** <see cref="AppDomain.AssemblyLoad" />（错过事件）；
+    ///         ② 首次尝试发生在**对方自己的初始化完成之前**（loader 先加载 dll、后调它的 <c>Initialize</c>）；
+    ///         ③ 首次尝试真的撞上窗口关闭 —— 这一次会以 <c>Error</c> 级日志把原因喊出来，不再静默。
+    ///     </para>
+    ///     <para>
+    ///         ⚠️ 用 <c>SubscribeLifecycleOnce</c> 且默认 <c>replayCurrentState: true</c>：
+    ///         即使订阅时该事件已经发生过，也会**同步回放**一次。
+    ///     </para>
+    /// </summary>
+    private static void SubscribeLateSweeps()
+    {
+        if (HextechRuneRegistrar.AllRegistered) return;
+
+        lock (Gate)
+        {
+            if (_lateSweepsSubscribed) return;
+            _lateSweepsSubscribed = true;
+        }
+
+        try
+        {
+            RitsuLibFramework.SubscribeLifecycleOnce<GameReadyEvent>(_ => RunLateSweep("GameReady"));
+            RitsuLibFramework.SubscribeLifecycleOnce<MainMenuReadyEvent>(_ => RunLateSweep("MainMenuReady"));
+        }
+        catch (Exception ex)
+        {
+            Warn($"late-sweep subscription failed: {ex.Message}");
+        }
+    }
+
+    private static void RunLateSweep(string whence)
+    {
+        try
+        {
+            if (HextechRuneRegistrar.AllRegistered) return;
+
+            var assembly = TargetAssembly ?? FindLoadedAssembly();
+            if (assembly is null)
+            {
+                Warn($"late sweep ({whence}): '{AssemblyName}' 仍未加载 ⇒ 9 个符文保持未注册。");
+                return;
+            }
+
+            Info($"late sweep ({whence}): retrying Hextech rune registration.");
+            TryBind(assembly);
+
+            if (!HextechRuneRegistrar.AllRegistered)
+                Error($"late sweep ({whence}): 仍未注册齐全 ⇒ 见上面 RegisterPlayerRune failed 的逐条原因。");
+        }
+        catch (Exception ex)
+        {
+            Warn($"late sweep ({whence}) failed: {ex.Message}");
+        }
+    }
+
     /// <summary>给 <see cref="HextechRuneRegistrar" /> 用的反射入口；<see cref="IsReady" /> 为 false 时返回 null。</summary>
     public static MethodInfo? ResolveInteropMethod(string name, Type[] parameterTypes)
     {
@@ -183,4 +270,6 @@ internal static class HextechCompat
     public static void Info(string message) => MainFile.Logger.Info($"{LogPrefix} {message}");
 
     public static void Warn(string message) => MainFile.Logger.Warn($"{LogPrefix} {message}");
+
+    public static void Error(string message) => MainFile.Logger.Error($"{LogPrefix} {message}");
 }

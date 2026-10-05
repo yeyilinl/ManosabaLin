@@ -58,19 +58,15 @@ public sealed class FinalJudgment : ManosabaCardTemplate
         var withPower = creature.GetPower<WithPower>();
         var witchAmount = (int)(withPower?.Amount ?? 0);
 
-        // 读取嫌疑
+        // 读取场上敌人
         var enemies = CombatState.Enemies.Where(e => e.IsAlive).ToList();
-        var totalSuspect = 0;
-        foreach (var enemy in enemies)
-        {
-            var suspect = enemy.GetPower<SuspectPower>();
-            if (suspect != null && suspect.Amount > 0)
-                totalSuspect += (int)suspect.Amount;
-        }
 
         await CreatureCmd.TriggerAnim(creature, "Cast", owner.Character.CastAnimDelay);
 
         // ===== 第一幕：羁绊 =====
+        // 卡面：「对全体敌人造成2倍(羁绊+审判)伤害
+        //        友方获得3倍「亲近」的格挡，全体敌人获得「疏远」层易伤。」
+        // ⇒ 亲近/疏远各自独立结算，不再二选一。
         var bondDamage = (bondTotal + trialCount) * 2;
         if (bondDamage > 0)
         {
@@ -78,12 +74,13 @@ public sealed class FinalJudgment : ManosabaCardTemplate
                 await CreatureCmd.Damage(choiceContext, enemy, bondDamage, ValueProp.Unpowered | ValueProp.Move, this, cardPlay);
         }
 
-        if (affinity > estrangement && affinity > 0)
+        if (affinity > 0)
         {
             foreach (var ally in CombatState.Allies.Where(a => a.IsAlive))
                 await CreatureCmd.GainBlock(ally, affinity * 3, ValueProp.Move, cardPlay);
         }
-        else if (estrangement > affinity && estrangement > 0)
+
+        if (estrangement > 0)
         {
             foreach (var enemy in enemies)
                 await PowerCmd.Apply<VulnerablePower>(choiceContext, enemy, estrangement, creature, this, false);
@@ -117,8 +114,9 @@ public sealed class FinalJudgment : ManosabaCardTemplate
             }
         }
 
-        // 抽牌: N + 魔女化联动
-        var drawCount = trialCount + witchAmount / 50;
+        // 卡面：「抽【审判】牌张卡牌，每50【魔女化】获得1点能量」
+        // ⇒ 抽牌只按【审判】牌数；【魔女化】只单独折算能量（不再额外附带抽牌/加成）。
+        var drawCount = trialCount;
         if (drawCount > 0)
             await CardPileCmd.Draw(choiceContext, drawCount, owner);
 
@@ -135,12 +133,7 @@ public sealed class FinalJudgment : ManosabaCardTemplate
         }
 
         // ===== 第三幕：魔女化 =====
-        var baseEnergy = witchAmount / 50;
-        var bonusEnergy = (witchAmount / 100) * 2;
-        var totalEnergy = baseEnergy + bonusEnergy;
-
-        var suspectMultiplier = 1m + totalSuspect * 0.05m;
-        totalEnergy = (int)(totalEnergy * suspectMultiplier);
+        var totalEnergy = witchAmount / 50;
 
         if (totalEnergy > 0)
             await PlayerCmd.GainEnergy(totalEnergy, owner);
@@ -154,7 +147,8 @@ public sealed class FinalJudgment : ManosabaCardTemplate
             var suspect = enemy.GetPower<SuspectPower>();
             if (suspect == null || suspect.Amount <= 0) continue;
 
-            var suspectDamage = (int)suspect.Amount * 3 + bondTotal;
+            // 卡面：「对每个有【嫌疑】的敌人造成3倍【嫌疑】伤害」
+            var suspectDamage = (int)suspect.Amount * 3;
             if (suspectDamage > 0)
                 await CreatureCmd.Damage(choiceContext, enemy, suspectDamage, ValueProp.Unpowered | ValueProp.Move, this, null);
 

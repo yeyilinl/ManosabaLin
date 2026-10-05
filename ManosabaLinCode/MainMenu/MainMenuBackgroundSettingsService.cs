@@ -31,6 +31,7 @@ public static class MainMenuBackgroundSettingsService
     {
         RegisterSettingsData();
         EventSettingsService.RegisterSettingsData();
+        HextechLinkageSettingsService.RegisterSettingsData();
         RitsuLibFramework.RegisterModSettings(
             MainFile.ModId,
             page => page
@@ -88,7 +89,23 @@ public static class MainMenuBackgroundSettingsService
                         EventSettingsService.TeamCardExchangeEventBinding,
                         EventSettingsService.T(
                             "MANOSABALIN_SETTINGS.events.teamCardExchangeEvent.description",
-                            "Allow the Cooperative Testimony event to appear."))),
+                            "Allow the Cooperative Testimony event to appear.")))
+                .AddSection("hextech", section => section
+                    .WithTitle(HextechLinkageSettingsService.T(
+                        "MANOSABALIN_SETTINGS.hextech.section.title",
+                        "Hextech Runes (Compat)"))
+                    .WithDescription(HextechLinkageSettingsService.T(
+                        "MANOSABALIN_SETTINGS.hextech.section.description",
+                        "When the Hextech Runes mod is installed, controls whether ManosabaLin character-specific linkage runes appear."))
+                    .AddToggle(
+                        "hextechLinkageEnabled",
+                        HextechLinkageSettingsService.T(
+                            "MANOSABALIN_SETTINGS.hextech.enabled.label",
+                            "Enable Hextech linkage runes"),
+                        HextechLinkageSettingsService.EnabledBinding,
+                        HextechLinkageSettingsService.T(
+                            "MANOSABALIN_SETTINGS.hextech.enabled.description",
+                            "When enabled, Sherrylin/Hiro/Ananlin may gain ManosabaLin-specific linkage runes when picking Hextech runes each floor. Only has effect with the Hextech Runes mod installed."))),
             "manosabalin");
     }
 

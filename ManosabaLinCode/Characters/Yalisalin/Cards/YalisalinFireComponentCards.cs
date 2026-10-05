@@ -36,7 +36,7 @@ public sealed class Unwantedkindness()
 
 [RegisterCard(typeof(YalisalinCardPool))]
 public sealed class Returnedhairribbon()
-    : ManosabaCardTemplate(1, CardType.Skill, CardRarity.Common, TargetType.AnyEnemy)
+    : ManosabaCardTemplate(1, CardType.Attack, CardRarity.Common, TargetType.AnyEnemy)
 {
     public override bool GainsBlock => true;
 
@@ -100,7 +100,7 @@ public sealed class Dontlookatme()
 
 [RegisterCard(typeof(YalisalinCardPool))]
 public sealed class Brokentrust()
-    : ManosabaCardTemplate(2, CardType.Attack, CardRarity.Common, TargetType.AnyEnemy)
+    : ManosabaCardTemplate(1, CardType.Attack, CardRarity.Common, TargetType.AnyEnemy)
 {
     protected override IEnumerable<DynamicVar> CanonicalVars => [new DamageVar(6, ValueProp.Move)];
 
@@ -127,9 +127,10 @@ public sealed class Brokentrust()
             selected.GetOrCreateCapability<YalisalinBrokenTrustFireComponentCapability>();
     }
 
+    /// <summary>升级不再减费，改为把伤害提到 10 点。</summary>
     protected override void OnUpgrade(ComponentContext componentContext)
     {
-        EnergyCost.UpgradeBy(-1);
+        DynamicVars.Damage.UpgradeValueBy(4);
     }
 }
 
@@ -352,7 +353,7 @@ public sealed class Stayingstillhurts()
 
 [RegisterCard(typeof(YalisalinCardPool))]
 public sealed class Dontbringmehome()
-    : ManosabaCardTemplate(2, CardType.Skill, CardRarity.Uncommon, TargetType.Self)
+    : ManosabaCardTemplate(1, CardType.Skill, CardRarity.Uncommon, TargetType.Self)
 {
     public override bool GainsBlock => true;
 
@@ -393,7 +394,7 @@ public sealed class Dontbringmehome()
 
 [RegisterCard(typeof(YalisalinCardPool))]
 public sealed class Warmthshouldnotstay()
-    : ManosabaCardTemplate(2, CardType.Power, CardRarity.Rare, TargetType.Self)
+    : ManosabaCardTemplate(1, CardType.Power, CardRarity.Rare, TargetType.Self)
 {
     protected override async Task OnPlay(PlayerChoiceContext choiceContext, CardPlay cardPlay, ComponentContext componentContext)
     {
@@ -443,7 +444,7 @@ public sealed class Burnedecho()
 
 [RegisterCard(typeof(YalisalinCardPool))]
 public sealed class Fifthselfproof()
-    : ManosabaCardTemplate(3, CardType.Attack, CardRarity.Rare, TargetType.AnyEnemy),
+    : ManosabaCardTemplate(1, CardType.Attack, CardRarity.Rare, TargetType.AnyEnemy),
         IYalisalinFireComponentModifier
 {
     // 余火材薪：只提供悬浮提示，不在卡面显示。
@@ -479,11 +480,15 @@ public sealed class Fifthselfproof()
         if (!context.CountsAsManualUse || !context.ChoiceCompleted)
             return Task.CompletedTask;
 
+        // 未升级：每完成 5 次余火选择得 1 计数；升级后：每完成 6 次得 2 计数。
+        var threshold = IsUpgraded ? 6 : 5;
+        var countGain = IsUpgraded ? 2 : 1;
+
         ManualFireUseProgress++;
-        if (ManualFireUseProgress >= 5)
+        if (ManualFireUseProgress >= threshold)
         {
-            ManualFireUseProgress -= 5;
-            FireUseCount++;
+            ManualFireUseProgress -= threshold;
+            FireUseCount += countGain;
             DynamicVars["FireCount"].BaseValue = FireUseCount;
         }
 
@@ -499,10 +504,5 @@ public sealed class Fifthselfproof()
                 YalisalinFireComponentContext.Text("rightClick.fifthSelfProof.prompt"),
                 this));
         }
-    }
-
-    protected override void OnUpgrade(ComponentContext componentContext)
-    {
-        EnergyCost.UpgradeBy(-1);
     }
 }

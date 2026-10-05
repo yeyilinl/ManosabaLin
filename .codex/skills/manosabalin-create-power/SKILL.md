@@ -42,11 +42,15 @@ public sealed class ExamplePower : ManosabaPowerTemplate
 
 ## Localization
 
-Update all supported locales:
+Update all 5 supported locales (zhs is the source language):
 
 - `ManosabaLin/localization/eng/powers.json`
 - `ManosabaLin/localization/zhs/powers.json`
 - `ManosabaLin/localization/jpn/powers.json`
+- `ManosabaLin/localization/kor/powers.json`
+- `ManosabaLin/localization/rus/powers.json`
+
+⚠️ Never rewrite these files with `json.dump` — BOM presence and indentation differ per file/locale. Edit line-by-line (or byte-level) and match each line's *actual* newline escaping (`\n` in one entry, `\\n` in the next — inconsistent even inside one file). Verify with `json.loads(bytes.decode('utf-8-sig'))` afterwards.
 
 Use keys like:
 
@@ -57,6 +61,28 @@ Use keys like:
 ```
 
 Use `smartDescription` when the base game surface benefits from a compact runtime description. Add selection prompt/custom suffixes only when code reads them.
+
+### State-dependent descriptions (e.g. "different text before/after upgrade")
+
+Only two engine paths exist, and they are not interchangeable:
+
+- `PowerModel.GetDumbHoverTip` (the power icon tooltip) reads **`Description`** only.
+- `PowerModel.SmartDescription` is used by `HoverTips` **only when `HasSmartDescription && IsMutable`**.
+
+⇒ To make a power's text change with state (upgraded, locked color, stack count, …) **override BOTH** `Description` and `SmartDescriptionLocKey`, switching the key by state:
+
+```csharp
+public override LocString Description =>
+    new LocString("powers", <COND> ? $"{Id.Entry}.descriptionEnhanced" : $"{Id.Entry}.description");
+
+protected override string SmartDescriptionLocKey =>
+    <COND> ? $"{Id.Entry}.smartDescriptionEnhanced" : $"{Id.Entry}.smartDescription";
+```
+
+- Key lookup is a plain runtime dictionary lookup — **no whitelist**. Any suffix works **as long as the code explicitly builds that key and the JSON has it**.
+- ⚠️ Never invent a suffix hoping the engine composes it: there is **no** built-in `Upgraded` key family (`descriptionUpgraded` is never queried — user-rejected on 10-04). `{IfUpgraded:...}` placeholders exist for **cards** only, not powers.
+- Existing project precedents: `MeruruAndEmaAccomplicePower` (stack-count tiers `description2`/`description3`…), `BoundPrometheusPower` (`descriptionLocked`), the 13 powers using `descriptionEnhanced`.
+- If only one state has custom text, keep the base key and add only the variant (smart channel falls back to `Description` automatically when its key is missing).
 
 ## Art
 
@@ -69,5 +95,5 @@ Use `smartDescription` when the base game surface benefits from a compact runtim
 ## Checks
 
 - Verify multiplayer-relevant logic uses awaited hooks and command APIs.
-- Keep localization aligned across `eng`, `zhs`, and `jpn`.
-- Run `dotnet build ManosabaLin.sln`.
+- Keep localization aligned across `eng`, `zhs`, `jpn`, `kor`, `rus`.
+- Build/publish with `dotnet publish ManosabaLin.csproj -c Release` (run once the game is closed — a running `SlayTheSpire2.exe` locks the mod DLL *and* the PCK).

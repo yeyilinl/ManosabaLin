@@ -30,13 +30,15 @@ public sealed class CardSixtyThree() : ManosabaCardTemplate(0, CardType.Skill, C
 
         await CreatureCmd.TriggerAnim(source.Owner.Creature, "Cast", source.Owner.Character.CastAnimDelay);
 
-        // 获取手牌（排除自己）
-        var handPile = PileType.Hand.GetPile(source.Owner);
-        var handCards = handPile.Cards.Where(c => c != source).ToList();
+        // 卡面：「从所有牌里面选择 N 张卡牌获得【轮回】」
+        // —— 「所有牌」= 手牌 + 抽牌堆 + 弃牌堆（用户 2026-10-02 明确）。
+        var candidates = new List<CardModel>();
+        foreach (var pileType in AllPiles)
+            candidates.AddRange(pileType.GetPile(source.Owner).Cards.Where(c => c != source));
 
-        if (handCards.Count == 0) return;
+        if (candidates.Count == 0) return;
 
-        // 选择手牌，数量使用动态变量
+        // 选择，数量使用动态变量
         var selectCount = source.DynamicVars["Cards"].IntValue;
         var prefs = new CardSelectorPrefs(source.SelectionScreenPrompt, selectCount, selectCount)
         {
@@ -45,7 +47,7 @@ public sealed class CardSixtyThree() : ManosabaCardTemplate(0, CardType.Skill, C
 
         var selectedCards = await CardSelectCmd.FromSimpleGrid(
             choiceContext,
-            handCards,
+            candidates,
             source.Owner,
             prefs
         );
@@ -53,6 +55,8 @@ public sealed class CardSixtyThree() : ManosabaCardTemplate(0, CardType.Skill, C
         // 给选中的卡牌添加轮回关键词
         foreach (var card in selectedCards) card.AddModKeyword(TransmigrationRules.TransmigrationCardKeyword);
     }
+
+    private static readonly PileType[] AllPiles = [PileType.Hand, PileType.Draw, PileType.Discard];
 
     protected override void OnUpgrade(ComponentContext componentContext)
     {

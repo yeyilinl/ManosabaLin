@@ -19,16 +19,24 @@ public sealed class AnanlinNoahAssistPower : ManosabaPowerTemplate
     public override PowerType Type => PowerType.Buff;
     public override PowerStackType StackType => PowerStackType.None;
 
+    /// <summary>
+    ///     描述随「来源牌是否升级」切键（升级也是一种达成条件）。数值本身由 Nym 动态变量给出，
+    ///     这里只按状态切键。两侧通道都切，做法对齐「共犯」/ 被缚的普罗米修斯。
+    /// </summary>
     public override LocString Description
     {
         get
         {
             RefreshNymVars();
-            var description = base.Description;
+            var description = new LocString("powers",
+                RewrittenNymAmount > 1 ? $"{Id.Entry}.descriptionEnhanced" : $"{Id.Entry}.description");
             DynamicVars.AddTo(description);
             return description;
         }
     }
+
+    protected override string SmartDescriptionLocKey =>
+        RewrittenNymAmount > 1 ? $"{Id.Entry}.smartDescriptionEnhanced" : $"{Id.Entry}.smartDescription";
 
     protected override IEnumerable<DynamicVar> CanonicalVars =>
     [

@@ -1,4 +1,5 @@
 using ManosabaLin.Characters.Common.Components.Abstracts;
+using ManosabaLin.Characters.Common.LinRelics;
 using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Creatures;
@@ -61,7 +62,7 @@ public sealed partial class RetainCounterComponent : KeywordLikeComponent
         return Task.CompletedTask;
     }
 
-    // 回合开始：加计数，变更数值
+    // 回合开始：加计数，变更数值；并联动核心遗物 3（见下）。
     public override async Task AfterPlayerTurnStartEarlyPostfix(
         PlayerChoiceContext choiceContext, Player player, ComponentContext componentContext)
     {
@@ -69,6 +70,11 @@ public sealed partial class RetainCounterComponent : KeywordLikeComponent
         if (Card.Pile?.Type != PileType.Hand) return;
 
         IncrementCounter();
+
+        // 与艾玛 Witchification 组件对齐：本组件卡面即「【魔女化】」，
+        // 「保留 → 回合开始 +1 计数」同样应触发联动遗物 3「+10 层【魔女化】」。
+        // 之前只挂了 Witchification，漏了 RetainCounterComponent —— 蓄力充能等计数 +1 时遗物静默无效果。
+        await HextechWitchificationCore.OnWitchificationCountGained(Card?.Owner, 1, choiceContext);
     }
 
     private void ApplyCounterToStoredValues()

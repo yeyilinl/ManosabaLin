@@ -10,7 +10,7 @@ using STS2RitsuLib.Interop.AutoRegistration;
 
 namespace ManosabaLin.Characters.Ema.Cards;
 
-/// <summary>推理成立 - 1费攻击, 4伤害; 本回合每打过1种【审判】附魔牌额外造成1段2伤害(升级: 7伤害/每段3点)</summary>
+/// <summary>推理成立 - 1费攻击, 4伤害并获得等量格挡; 本回合每打过1种【审判】附魔牌额外造成1段2伤害(升级: 7伤害/每段3点)</summary>
 [RegisterCard(typeof(EmalinCardPool))]
 public sealed class ReasoningEstablished : ManosabaCardTemplate
 {
@@ -22,6 +22,8 @@ public sealed class ReasoningEstablished : ManosabaCardTemplate
 
     public ReasoningEstablished() : base(1, CardType.Attack, CardRarity.Common, TargetType.AnyEnemy) { }
 
+    public override bool GainsBlock => true;
+
     protected override IEnumerable<DynamicVar> CanonicalVars => [new DamageVar(4m, ValueProp.Move)];
 
     protected override async Task OnPlay(PlayerChoiceContext choiceContext, CardPlay cardPlay, ComponentContext componentContext)
@@ -29,25 +31,34 @@ public sealed class ReasoningEstablished : ManosabaCardTemplate
         var target = cardPlay.Target;
         if (target == null) return;
 
+        var totalDamage = 0m;
+
         // 第 1 段：基础伤害
-        await DamageCmd.Attack(DynamicVars.Damage.BaseValue)
+        var baseAttack = await DamageCmd.Attack(DynamicVars.Damage.BaseValue)
             .FromCard(this, cardPlay)
             .Targeting(target)
             .WithHitFx("vfx/vfx_attack_slash")
             .Execute(choiceContext);
+        totalDamage += baseAttack.Results.SelectMany(static hit => hit).Sum(static r => r.TotalDamage);
 
         // 后续段：本回合每打过 1 种【审判】附魔牌（赞同/反驳/疑问），额外造成 1 段伤害。
         // 数「种」而不是「张」——同一种附魔打出多张也只算 1 段（与「失控的恨意」一致）。
         var enchantmentTypeCount = EmalinCombatHelper.GetDistinctEnchantmentTypesThisTurn(
             Owner.Creature, CombatState);
-        if (enchantmentTypeCount <= 0 || !target.IsAlive) return;
+        if (enchantmentTypeCount > 0 && target.IsAlive)
+        {
+            var extraAttack = await DamageCmd.Attack(IsUpgraded ? UpgradedSegmentDamage : SegmentDamage)
+                .FromCard(this, cardPlay)
+                .Targeting(target)
+                .WithHitCount(enchantmentTypeCount)
+                .WithHitFx("vfx/vfx_attack_slash")
+                .Execute(choiceContext);
+            totalDamage += extraAttack.Results.SelectMany(static hit => hit).Sum(static r => r.TotalDamage);
+        }
 
-        await DamageCmd.Attack(IsUpgraded ? UpgradedSegmentDamage : SegmentDamage)
-            .FromCard(this, cardPlay)
-            .Targeting(target)
-            .WithHitCount(enchantmentTypeCount)
-            .WithHitFx("vfx/vfx_attack_slash")
-            .Execute(choiceContext);
+        // 卡面：「造成 N 点伤害并获得等量格挡」⇒ 等量 = 本次打出的总伤害（基础段 + 全部额外段）。
+        if (totalDamage > 0m)
+            await CreatureCmd.GainBlock(Owner.Creature, totalDamage, ValueProp.Move, cardPlay);
     }
 
     protected override void OnUpgrade(ComponentContext componentContext)

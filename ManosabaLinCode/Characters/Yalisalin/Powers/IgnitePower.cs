@@ -16,6 +16,13 @@ public sealed class IgnitePower : ManosabaPowerTemplate
     public override PowerType Type => PowerType.Buff;
     public override PowerStackType StackType => PowerStackType.Counter;
 
+    /// <summary>
+    ///     点火的一次攻击命中<b>友方</b>（含玩家自己；<c>combatState.Allies</c> 包含自己）后触发。
+    ///     参数为点火能力的持有者（<see cref="Player" />）。
+    ///     「自罚上瘾」的【原罪】引擎靠它把「点火打到自己人」转成【余火】。
+    /// </summary>
+    public static event Action<PlayerChoiceContext, Player>? AllyHit;
+
     public override async Task AfterPlayerTurnStart(PlayerChoiceContext choiceContext, Player player)
     {
         if (player?.Creature != Owner) return;
@@ -28,7 +35,11 @@ public sealed class IgnitePower : ManosabaPowerTemplate
         await TriggerIgnite(choiceContext);
     }
 
-    private async Task TriggerIgnite(PlayerChoiceContext choiceContext)
+    /// <summary>
+    ///     立刻执行一次完整点火（按当前层数随机攻击 N 次）。回合开始/结束自动调用；
+    ///     卡牌（如「自罚上瘾」）也可以手动调用它来「触发一次点火能力的攻击」。
+    /// </summary>
+    internal async Task TriggerIgnite(PlayerChoiceContext choiceContext)
     {
         if (Owner?.CombatState is not { } combatState) return;
         if (Owner?.Player is not { } player) return;
@@ -79,6 +90,9 @@ public sealed class IgnitePower : ManosabaPowerTemplate
             {
                 // 命中友方：本能力 +2 层
                 await PowerCmd.ModifyAmount(choiceContext, this, 2m, Owner, null);
+
+                // 广播「点火命中友方」（卡牌/能力可订阅，例如【原罪】）
+                AllyHit?.Invoke(choiceContext, player);
             }
         }
     }

@@ -9,6 +9,7 @@ namespace ManosabaLin.Characters.Common.AncientCurses;
 [RegisterCard(typeof(LinCardPool))]
 public sealed class SherryVoid : LinAncientCurseCard
 {
+    public SherryVoid() : base(1) { }
 
     protected override IEnumerable<DynamicVar> CanonicalVars
     {

@@ -1,4 +1,5 @@
 using ManosabaLin.Characters.Ananlin.Relics;
+using ManosabaLin.Characters.Common.LinRelics;
 using ManosabaLin.Characters.Hiro.Powers;
 using MegaCrit.Sts2.Core.Saves.Runs;
 using MinionLib.RightClick;
@@ -95,13 +96,18 @@ public sealed class AnanlinBrainwashPower : ManosabaPowerTemplate, IEasyRightCli
         // 按中文文案：每次强制洗脑（改写成功）都获得25层【魔女化】
         await PowerCmd.Apply<WithPower>(choiceContext, Owner, 25m, Owner, null, false);
 
-        await PowerCmd.Apply<AnanlinBrainwashBacklashPower>(
-            choiceContext,
-            Owner,
-            1m,
-            Owner,
-            null,
-            false);
+        // 【连线】海克斯「洗脑共鸣」：每场战斗的第一次强制洗脑**不获得**【洗脑反噬】。
+        // 只有真正改写成功、且不是「无援助」路径时才会走到这里 ⇒ 免反噬的消耗点语义正确。
+        if (!HextechBrainwashResonance.TryWaiveBrainwashBacklash(Owner.Player))
+        {
+            await PowerCmd.Apply<AnanlinBrainwashBacklashPower>(
+                choiceContext,
+                Owner,
+                1m,
+                Owner,
+                null,
+                false);
+        }
 
         RefreshRequiredSilenceCostVar();
     }

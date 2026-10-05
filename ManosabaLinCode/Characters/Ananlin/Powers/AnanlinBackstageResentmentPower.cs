@@ -33,16 +33,26 @@ public sealed class AnanlinBackstageResentmentPower : ManosabaPowerTemplate
         }
     }
 
+    /// <summary>
+    ///     描述随「来源牌是否升级」切键（升级也是一种达成条件）。两侧通道都切，做法对齐「共犯」/
+    ///     被缚的普罗米修斯。
+    /// </summary>
     public override LocString Description
     {
         get
         {
-            var description = base.Description;
+            var description = new LocString("powers",
+                FirstAuditionEffectTriggersAgain ? $"{Id.Entry}.descriptionEnhanced" : $"{Id.Entry}.description");
             description.Add(new IntVar("RequiredSilenceCost", CurrentRequiredSilenceCost));
             description.Add(new IntVar("SilenceCostIncrease", AnanlinBrainwashBacklashPower.BrainwashSilenceCostIncrease));
             return description;
         }
     }
+
+    protected override string SmartDescriptionLocKey =>
+        FirstAuditionEffectTriggersAgain
+            ? $"{Id.Entry}.smartDescriptionEnhanced"
+            : $"{Id.Entry}.smartDescription";
 
     protected override IEnumerable<DynamicVar> CanonicalVars =>
     [

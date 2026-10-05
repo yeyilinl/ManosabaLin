@@ -17,7 +17,7 @@ using System.Threading.Tasks;
 using ManosabaLin.Characters.Ema.Powers;
 using ManosabaLin.Characters.Hiro;
 
-namespace ManosabaLin.Characters.Ema.Cards;
+namespace ManosabaLin.Characters.Hiro.Cards;
 
 [RegisterCard(typeof(HirolinCardPool))]
 public sealed class Mlym : ManosabaCardTemplate

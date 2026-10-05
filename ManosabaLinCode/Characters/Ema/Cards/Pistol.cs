@@ -39,7 +39,9 @@ public sealed class Pistol : ManosabaCardTemplate
         var creature = Owner.Creature;
         var target = cardPlay.Target ?? creature;
 
-        await PowerCmd.Apply<StrengthPower>(choiceContext, target, DynamicVars["TempStrength"].BaseValue, creature, this);
+        // ⚠️ 必须给**临时**力量（`TempStrength`，回合结束消失）—— 用户 2026-10-02 裁决。
+        //    此前误写成 `StrengthPower`（永久力量），与卡面「临时力量」的文案不符。
+        await PowerCmd.Apply<TempStrength>(choiceContext, target, DynamicVars["TempStrength"].BaseValue, creature, this);
         await CreatureCmd.GainBlock(creature, DynamicVars.Block, cardPlay);
     }
 

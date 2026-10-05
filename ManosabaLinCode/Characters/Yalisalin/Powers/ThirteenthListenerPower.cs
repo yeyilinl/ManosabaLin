@@ -6,8 +6,9 @@ using STS2RitsuLib.Interop.AutoRegistration;
 namespace ManosabaLin.Characters.Yalisalin.Powers;
 
 /// <summary>
-/// 第十三格旁听：每当触发火色「连续」，额外消耗同一名敌人层数格火色，并抽层数张牌。
-/// 额外消耗照常进入连续链，可能再次凑成连续；量表有限，链条总会停下。
+/// 第十三格旁听：每当触发火色「连续」，先给予同一名敌人层数格火色，
+/// 再消耗该敌人层数格火色并抽层数张牌（卡面「给予1格火色然后消耗1格火色并抽1张卡牌」）。
+/// 额外消耗照常进入连续链：成对判定后链计数归零，这次额外消耗最多把计数顶回 1 ⇒ 顶多再推进一步即停。
 /// </summary>
 [RegisterPower]
 public sealed class ThirteenthListenerPower : ManosabaPowerTemplate
@@ -24,8 +25,10 @@ public sealed class ThirteenthListenerPower : ManosabaPowerTemplate
             || !YalisalinFireColorSystem.TryGetHairpin(player, out var hairpin))
             return;
 
+        var amount = (int)Amount;
         Flash();
-        await CardPileCmd.Draw(choiceContext, (int)Amount, player);
-        await hairpin.ConsumeFireColor(choiceContext, target, (int)Amount, source);
+        await hairpin.GiveFireColor(choiceContext, target, amount, source);
+        await hairpin.ConsumeFireColor(choiceContext, target, amount, source);
+        await CardPileCmd.Draw(choiceContext, amount, player);
     }
 }

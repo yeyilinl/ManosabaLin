@@ -4,7 +4,7 @@ namespace ManosabaLin.Characters.Yalisalin.Cards;
 
 /// <summary>
 ///     火之时代（1 费 能力・稀有）：
-///     打出时，将【传火】【灭火】【夺火】三张卡加入手牌。
+///     打出时，将【夺火】【传火】【灭火】三张卡加入手牌（顺序与卡面一致）。
 ///     当你打出其中任意一张时，另外两张会从本场战斗中移除
 ///     —— 你选中的那条路，就是这一局的火之时代。
 /// </summary>
@@ -22,9 +22,9 @@ public sealed class AgeOfFire()
     {
         get
         {
+            yield return CardEffectHoverTipFactory.FromCard<UsurpTheFlame>("MANOSABA_LIN_CARD_USURP_THE_FLAME_EFFECT");
             yield return CardEffectHoverTipFactory.FromCard<LinkTheFire>("MANOSABA_LIN_CARD_LINK_THE_FIRE_EFFECT");
             yield return CardEffectHoverTipFactory.FromCard<ExtinguishFlame>("MANOSABA_LIN_CARD_EXTINGUISH_FLAME_EFFECT");
-            yield return CardEffectHoverTipFactory.FromCard<UsurpTheFlame>("MANOSABA_LIN_CARD_USURP_THE_FLAME_EFFECT");
         }
     }
 
@@ -38,11 +38,12 @@ public sealed class AgeOfFire()
 
         await CreatureCmd.TriggerAnim(owner.Creature, "Cast", owner.Character.CastAnimDelay);
 
+        // 加入顺序与卡面描述一致：【夺火】(黄) →【传火】(绿) →【灭火】(蓝)。
         var branches = new CardModel[]
         {
+            combatState.CreateCard<UsurpTheFlame>(owner),
             combatState.CreateCard<LinkTheFire>(owner),
-            combatState.CreateCard<ExtinguishFlame>(owner),
-            combatState.CreateCard<UsurpTheFlame>(owner)
+            combatState.CreateCard<ExtinguishFlame>(owner)
         };
 
         foreach (var branch in branches)

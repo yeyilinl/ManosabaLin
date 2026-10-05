@@ -251,6 +251,8 @@ var register = interop.GetMethod("RegisterPlayerRune",
 
 ### 2.8 6 个联动遗物：已落地（2026-09-28，`-t:Compile` 0 错误）
 
+> 📌 2026-09-29 又追加了 **3 个安安专属**联动遗物（书页 / 安心 / 缄默·洗脑）⇒ 见 **§2.10**，本节只讲最初这 6 个。
+
 > ⚠️ **本节记录的是「离线那条线」** —— `LinRelicPool` 里的普通 Starter 遗物。
 > §2.2 / §2.3 / §2.4 的**海克斯注册桥仍未开工**，所以现在不论装不装海克斯，这 6 个遗物都只有
 > 我方普通遗物这一份身份，还没有「海克斯符文」的第二身份。
@@ -266,9 +268,9 @@ var register = interop.GetMethod("RegisterPlayerRune",
 
 | # | 类 | 效果 | 关键落点 |
 | --- | --- | --- | --- |
-| 1 | `HextechDeckCleanser` | 每回合开始可把四堆里任意张牌扔进弃牌堆 | `AfterPlayerTurnStart` + `CardSelectCmd.FromSimpleGrid`（自带同步） |
+| 1 | `HextechDeckCleanser` | 每回合**自动抽牌前**可把四堆里任意张牌扔进弃牌堆 | `BeforeHandDraw` + `CardSelectCmd.FromSimpleGrid`（自带同步） |
 | 2 | `HextechEmotionOverflow` | 球位满时按三类分派：**持续型脱离球位、改挂血条下方**（还是那颗球、效果照旧）、反伤型/延迟型**被挤出时立刻激发**（**2026-09-29 定稿，见下行**） | `OrbCmd.Channel` prefix + `AfterOrbEvoked` + `IEmotionOrb` + 挤出标记 + `HangingEmotionOrbs`（`ModHelper.SubscribeForCombatStateHooks`） |
-| 3 | `HextechWitchificationCore` | 【魔女化计数】每 +1 就 +10 层【魔女化】；回合开始 >300 降到 100，削减层数 25:1 转计数；**计数还由「保留」自动累积**（见下） | `Witchification.AddWitchificationCount` 回调 + `AfterPlayerTurnStart` + `Witchification` 的保留三件套 |
+| 3 | `HextechWitchificationCore` | 【魔女化计数】每 +1 就 +10 层【魔女化】（由「保留 → 下回合开始 +1 计数」驱动）；**旧版 300→100 削层折返已删（2026-10-01）** | `Witchification.AddWitchificationCount` 回调 + `Witchification` 的保留三件套 |
 | 4 | `HextechTransmigrationEcho` | 打出【轮回】牌改为自动打抽牌堆任意 2 张【轮回】 | `TransmigrationSingleton.AfterCardPlayed` prefix 接管 |
 | 5 | `HextechPerjuryPayment` | 能量不足时用 3×缺口【伪证】顶替；1 层【正义】→4 层【伪证】 | `HasEnoughResourcesFor` postfix + `SpendResources` prefix |
 | 6 | `HextechJusticeRegen` | 回合结束【正义】>【再生】则补齐【再生】；【正义】不再回血 | `AfterSideTurnEnd` + 拦 `JusticePower.AfterSideTurnEnd` 的 Heal |
@@ -316,9 +318,10 @@ var register = interop.GetMethod("RegisterPlayerRune",
 
 **遗物 3 的「计数来源」**：`Witchification` 组件照搬 `RetainCounterComponent` 范式
 （`OnAttach` / `BeforeSideTurnEndPostfix` 续期 `GiveSingleTurnRetain()`，`AfterPlayerTurnStartEarlyPostfix`
-在 `PileType.Hand` 里 `AddWitchificationCount(1)`）⇒ 每回合保留一次就 +1 计数。
-⚠️ `AddWitchificationCount(amount, grantWitchification)` 的 `false` 分支**只累加、不回调**，
-遗物 3 削层后必须传 `false`（否则 400→100 会立刻被回调涨回 220）。
+在 `PileType.Hand` 里 `AddWitchificationCount(1)`）⇒ 每回合保留一次就 +1 计数 ⇒ 回调 +10 层【魔女化】。
+⚠️ 2026-10-01 用户裁定：遗物 3 **只有「保留 → +1 计数 → 获得魔女化」这一件事**，
+旧版「回合开始把 >300 层削减到 100 并 25:1 转计数」已删除（`AfterPlayerTurnStart`、`CardsWithWitchification`、
+`grantWitchification:false` 折返路径全部移除）。
 
 **Patch 文件**：`ManosabaLinCode/Patches/HextechRelicPatches.cs`，5 个 patch 类。
 ⚠️ **全部打的是引擎方法或我方自己的类型**（`OrbCmd.Channel` / `PlayerCombatState.HasEnoughResourcesFor` /
@@ -394,9 +397,8 @@ var register = interop.GetMethod("RegisterPlayerRune",
 （`ValueProp.Unpowered`）；`_resolvingBacklash` 重入保护保证反噬自己造成的伤害不再被统计。
 
 **遗物 3「计数是拆分」不是「每张各一份」（用户 2026-09-29 裁定）**：
-`HextechWitchificationCore.AfterPlayerTurnStart` 里那 `count` 点计数是**在带组件的卡之间瓜分**（合计恰为 `count`），
-方式按用户 2026-09-28 的原话「将 12 点计数**随机分给**所有牌中魔女化组件卡」⇒ 逐点用
-`Owner.RunState.Rng.CombatCardSelection` 随机指派（只有 1 张卡时直接全给它）。
+> ⚠️ 2026-10-01 起**该条作废**——「拆分」逻辑随 300→100 削层折返一起删除（见上）。
+> 现在计数**只**来自「保留」自动累积（每张带组件的卡各自 +1），不再有「把 N 点计数随机瓜分给组件卡」这条路径。
 
 ### 2.9 注册桥：已落地（2026-09-28，`-t:Compile` 0 错误）
 
@@ -405,8 +407,8 @@ var register = interop.GetMethod("RegisterPlayerRune",
 | 文件 | 职责 |
 | --- | --- |
 | `HextechCompat.cs` | 门控。按**程序集名**找 `HextechRunes` → 解析 `HextechRunes.HextechRunesInterop` → 读 `ApiVersion`；没找到就订阅 `AssemblyLoad`（载入后自解绑再注册）；`ResolveInteropMethod(name, paramTypes)` 供**逐成员**能力探测 |
-| `HextechRuneCatalog.cs` | 纯数据。6 条 `HextechRuneSpec`（字段就是 `RegisterPlayerRune` 入参）+ `Validate()` 自检（具体类型 / `RelicModel` 子类 / 品级名合法） |
-| `HextechRuneRegistrar.cs` | 反射桥。`RegisterPlayerRune` × 6 → `SetPlayerRunePoolLabel` × 6 → `RegisterConfigSectionTitle` × 1；幂等，**逐个 try/catch**（`TargetInvocationException.InnerException` 解包），绝不因单个符文打断 mod 初始化 |
+| `HextechRuneCatalog.cs` | 纯数据。**9 条** `HextechRuneSpec`（字段就是 `RegisterPlayerRune` 入参；2026-09-29 追加安安 3 条）+ `Validate()` 自检（具体类型 / `RelicModel` 子类 / 品级名合法） |
+| `HextechRuneRegistrar.cs` | 反射桥。`RegisterPlayerRune` × 9 → `SetPlayerRunePoolLabel` × 9 → `RegisterConfigSectionTitle` × 1；幂等，**逐个 try/catch**（`TargetInvocationException.InnerException` 解包），绝不因单个符文打断 mod 初始化 |
 
 **接线**：`MainFile.cs` 在 `GuardOneRewardRegistrar.Register()` 之后调 `HextechCompat.Initialize()`（紧邻 `harmony.PatchAll()`），
 注释里点明「必须在模组初始化阶段调用，要赶在共享遗物池首次枚举之前」。
@@ -414,7 +416,8 @@ var register = interop.GetMethod("RegisterPlayerRune",
 **与 §2.2 草图的差异**：门控的程序集属性改名 `Assembly` → **`TargetAssembly`**
 （`Assembly` 会与 `System.Reflection.Assembly` 类型名在同一作用域冲突）。
 
-**数据表（2026-09-28 用户裁定可用性：3 张仅雪莉琳 + 3 张仅希罗，无「通用」；2026-09-29 用户裁定品级：全部棱彩）**
+**数据表（2026-09-28 用户裁定可用性：3 张仅雪莉琳 + 3 张仅希罗，无「通用」；2026-09-29 用户裁定品级：全部棱彩；
+2026-09-29 追加 3 张仅安安，品级同样棱彩）**
 
 | # | 遗物 | 海克斯**品级** | `isAvailableForPlayer` | 依据 |
 | --- | --- | --- | --- | --- |
@@ -424,8 +427,11 @@ var register = interop.GetMethod("RegisterPlayerRune",
 | 4 | `HextechTransmigrationEcho` | Prismatic | **仅希罗** | 【轮回】只在希罗卡池（25 处引用，其余角色 0） |
 | 5 | `HextechPerjuryPayment` | Prismatic | **仅希罗** | 【伪证】/【正义】只在希罗卡池（27 处） |
 | 6 | `HextechJusticeRegen` | Prismatic | **仅希罗** | 同上 |
+| 7 | `HextechColorlessPage` | Prismatic | **仅安安** | 书页（`BlankPage`/`MarginPage`/`BorrowedMarginPage`）只在安安体系里（详 §2.10） |
+| 8 | `HextechPeaceOfMindEcho` | Prismatic | **仅安安** | 【安心】只在安安（`AnanlinPeaceOfMindPower`） |
+| 9 | `HextechBrainwashResonance` | Prismatic | **仅安安** | 【洗脑】/【缄默】/【洗脑反噬】整条链只在安安 |
 
-- ✅ **品级：6 条一律 `"Prismatic"`（用户 2026-09-29「这六个遗物都是棱彩品质」）**，
+- ✅ **品级：9 条一律 `"Prismatic"`（用户 2026-09-29「这六个遗物都是棱彩品质」+ 追加 3 条时答复「也用棱彩」）**，
   落地为常量 `HextechRuneCatalog.RuneRarity`（原先 1/4/5 = Gold、6 = Silver）。
   ⚠️ **这个「棱彩」是海克斯自己的三档品级（字符串），不是原版稀有度** ——
   原版 `RelicRarity` 枚举里**没有 Prismatic**（`None/Starter/Common/Uncommon/Rare/Shop/Event/Ancient`），
@@ -449,6 +455,282 @@ var register = interop.GetMethod("RegisterPlayerRune",
 
 **验收（已实测）**：产物 DLL 里 `HextechRunes` 在 **`#Strings`(UTF-8) 命中 0 次**、只在 **`#US`(UTF-16) 命中 12 次**
 ⇒ 「零编译期引用」成立（§3-1 的判据）。
+
+### 2.10 安安专属 3 个联动遗物：已落地（2026-09-29，`-t:Compile` 0 错误）
+
+用户原话（一字不改）：
+
+> 「写三个安安专属的海克斯联动遗物。第一个是你的书页（包括留白书页和空白书页）会再增加一个可以免费打出一次的无色选项，
+> 第二个是安心会按照层数给予额外效果，打出攻击牌获得当前安心层数活力，技能牌获得当前安心层数格挡，能力牌消耗当前所有安心获得等量留白书页然后获得3层安心
+> 第三个是洗脑和缄默共用缄默的可成长替换池并且洗脑每场战斗第一次不获得洗脑反噬」
+
+**三个新文件**（与其余 6 个同目录 `ManosabaLinCode/Characters/Common/LinRelics/`，全部
+`ManosabaRelicTemplate` + `[RegisterRelic(typeof(LinRelicPool))]` + `Rarity => RelicRarity.Starter`）：
+
+| # | 类 | 效果 | 关键落点 |
+| --- | --- | --- | --- |
+| 7 | `HextechColorlessPage` | 书页的选项网格**多一个**「本回合可免费打出的无色牌」选项 | `AppendColorlessOption(player, options)`，由 `AnansSketchbook` 三个书页入口调用 |
+| 8 | `HextechPeaceOfMindEcho` | 【安心】按层数追加上限：攻击→等量活力／技能→等量格挡／能力→消耗全部安心换等量留白书页再补 3 层 | `AfterCardPlayed` |
+| 9 | `HextechBrainwashResonance` | 【洗脑】吃【缄默】的可成长替换池；每场战斗第一次洗脑不获得【洗脑反噬】 | `AnanlinSilenceIntentManager.ForceBrainwashAndGetTargets` 的 `baseBonus` + `AnanlinBrainwashPower.OnRightClick` |
+
+#### 7. `HextechColorlessPage`（无色书页）
+
+- 追加点 = `AnansSketchbook.UseBlankPage` / `UseMarginPage` / `ResolveBorrowedMarginPage` 三处，
+  **放在各自的升级循环之后、`CardSelectCmd` 之前**。
+  ⚠️ 顺序是有意的：这样追加的那张无色牌**不会**跟着升级版书页一起被 `CardCmd.Upgrade`。
+- ⚠️ 为了让「升级后再追加」可行，把两个私有方法 `RollMarginPageOptions` / `RollBorrowedMarginOptions` 的返回类型
+  从 `IReadOnlyList<CardModel>` **收窄为 `List<CardModel>`**（纯内部签名、无行为变化），
+  这样 `options` 的静态类型才能匹配 `AppendColorlessOption(Player, List<CardModel>)`。
+- 取牌：`ModelDb.CardPool<ColorlessCardPool>().GetUnlockedCards(player.UnlockState, player.RunState.CardMultiplayerConstraint)`
+  → 过滤 `CanBeGeneratedInCombat` + 排除 `Basic/Ancient/Event/Token/Status/Curse/Quest`
+  → `player.RunState.Rng.CombatCardGeneration.NextItem(...)`（**联机铁律：一切随机必须走 `RunState.Rng`**）。
+- 「免费打出一次」= `CardModel.SetToFreeThisTurn()`（原版 `Discovery`/`BulletTime` 用的就是这个）。
+- ⚠️ 遗留行为：书页在 `recordedPools.Length == 0` 时**仍会提前 `return []`**（在原逻辑之前）⇒
+  素描本一张卡池都没记录时，书页依旧什么都不给（追加点在那之后）。这是**刻意保留原判据**，没动。
+
+#### 8. `HextechPeaceOfMindEcho`（安心回响）
+
+- `AfterCardPlayed(PlayerChoiceContext, CardPlay)`，先 `if (cardPlay.Card.Owner != Owner) return;`，
+  再在**这一瞬间**读 `Owner.Creature.GetPower<AnanlinPeaceOfMindPower>()?.Amount` = 「当前安心层数」。
+- 攻击（`CardType.Attack`，层数 > 0）：`PowerCmd.Apply<VigorPower>(..., stacks, ...)`。
+- 技能（`CardType.Skill`，层数 > 0）：`CreatureCmd.GainBlock(Owner.Creature, stacks, ValueProp.Move, cardPlay)`
+  （`ValueProp.Move` 与 `AnanlinSealedPagePower` 那种「能力给格挡」的写法一致）。
+- 能力（`CardType.Power`）：**走现成工具 `AnanlinCardHelpers.LosePeaceOfMind`**
+  ⭐ 用户 2026-09-29 裁定：「能力牌消耗当前所有安心时**要**触发安心原有的『一次性失去 ≥2 层 → 选择一张手牌获得【重放1】』」
+  ⇒ 所以不能用裸 `PowerCmd.ModifyAmount`，必须走这个 helper（它内部 ≥2 层会弹 `CardSelectCmd.FromSimpleGrid`）。
+  然后 `AddMarginPagesToHand(consumed)` 加等量【留白书页】，最后
+  `PowerCmd.Apply<AnanlinPeaceOfMindPower>(..., 3, ...)` 补回 3 层（上限仍由能力的 `MaxStacks = 3` 兜底）。
+- ⚠️ **按字面执行**：能力牌那条**无条件**先消耗（有几层耗几层）⇒ 安心为 0 时也照常补到 3 层。
+  若这不是想要的语义，只需给 `case CardType.Power` 加一个 `when stacks > 0`。
+
+#### 9. `HextechBrainwashResonance`（洗脑共鸣）
+
+- ⭐ **共用可成长替换池**：「可成长替换池」= `AnanlinSilenceIntentManager` 的
+  `SilenceGrowthByPlayer`（`GetSilenceGrowth(owner)`，每次**缄默**替换意图后 +1）。
+  默认洗脑走的是写死的 `baseBonus: 0`（注释原话「不随缄默成长」）；
+  持有本遗物后改为 `GetSilenceGrowth(owner)` ⇒ 洗脑与缄默**吃同一个池子**。
+- ⭐ 用户 2026-09-29 裁定原话：「**现在缄默的池子就是可成长替换池，遗物只是让洗脑也能吃这个加成**」
+  ⇒ 最初实现为「洗脑只读取、不推进」。
+- ⭐ **2026-10-01 用户（海克斯联动第 5 条）改判**：洗脑不仅要**读取**、还要**推进**同一个通用意图池 ——
+  「通用意图池并且都能强化」。现 `ForceBrainwashAndGetTargets` 末尾**补上了** `SilenceGrowthByPlayer[...] + 1`
+  （仅当 `HextechBrainwashResonance.IsActiveFor(owner)` 时），与缄默 `TriggerAndGetTargets` 末尾一致。
+  ⇒ 缄默与洗脑**都能**让这个可成长池 +1。
+- **每场战斗第一次免反噬**：`AnanlinBrainwashPower.OnRightClick` 里那次
+  `PowerCmd.Apply<AnanlinBrainwashBacklashPower>` 外面包一层
+  `if (!HextechBrainwashResonance.TryWaiveBrainwashBacklash(Owner.Player)) { ... }`。
+  - 位置语义正确：该处只在**真正改写成功**、且**不是「无援助」路径**时才会执行
+    （前面已有 `if (rewrittenTargets.Count == 0 && !useNoahAssist) return;` + `if (useNoahAssist) { …; return; }`）
+    ⇒ 「第一次**能获得**反噬的机会」才消耗豁免，失败尝试不吃掉它。
+  - 标记 `[SavedProperty] public bool BrainwashBacklashWaivedThisCombat`（**联机同步**），
+    在 `BeforeCombatStart()` 重置。
+  - ⚠️ 只跳过**反噬**；那 25 层【魔女化】照常给。
+
+**本地化**：5 语言 `relics.json` 各 +9 键（`…_COLORLESS_PAGE` / `…_PEACE_OF_MIND_ECHO` / `…_BRAINWASH_RESONANCE` × `.title/.description/.flavor`）。
+⚠️ 表与其余海克斯遗物同表（`relics`），插入时**逐文件保持原有 BOM=True + 纯 CRLF**
+（用脚本「末条补逗号 + 插行」，绝不 `json.dump` 整表重写）；插入后 5 个文件均 `json.loads` 通过。
+
+### 2.11 2026-10-01 修复（用户本轮 7 项诉求的落地）
+
+1. **牌库清道夫**：`AfterPlayerTurnStart` → `BeforeHandDraw`（自动抽牌**前**触发，先清道夫后抽牌）。
+2. **魔女化核心**：删掉旧版「>300 降到 100 + 25:1 转计数」整条 `AfterPlayerTurnStart`，只留
+   「保留 → +1 计数 → +10 层【魔女化】」这一件事（见 §2.8 遗物 3 更新）。
+3. **情绪溢流持续性 UI**：`EmotionHangDisplay.CardScale` 0.5 → **0.25**（原本 1/4）；`CanShow()` 不再用
+   `GetCurrentScreen() is NCombatRoom`（切牌组等覆盖层会误隐藏），改为「生物节点在场景树可见即显示」；
+   `_Process` 兜底 `Visible = true`（`Rebuild` 签名不变时提前 return 不再卡在隐藏态）。
+4. **厌恶/骇厌/延迟形失效 + 挤球吞新卡**：`HextechOrbEvokeRules` 由单槽静态字段改
+   `ConditionalWeakTable<OrbModel, object>`（引用语义、多球不互踩、未命中不清空、命中才消费）；
+   `HextechOrbOverflowPatch` 只给 `EmotionOverflowRules.HasOverflowPayout` 的球打标记（非情绪球/魔女化球/
+   无遗物时的持续型球不再占用/残留标记）。
+5. **洗脑共鸣**：`ForceBrainwashAndGetTargets` 末尾补 `SilenceGrowthByPlayer[...] + 1`（仅遗物在场时）⇒
+   洗脑与缄默**共用同一通用意图池、都能推进**。
+6. **洗脑/洗脑反噬中文显示英文**：`zhs/powers.json` 缺两个 `.smartDescription` 键（eng/jpn/kor/rus 都有），
+   补上 `MANOSABA_LIN_POWER_ANANLIN_BRAINWASH_POWER.smartDescription` 与 `..._BACKLASH_POWER.smartDescription`。
+7. **海克斯每层必出专属联动符文**：⛔ **无公开能力、做不了**——候选生成链（`ResolveActRoll`→`PickWeightedDistinct`）
+   无「保底槽」插入点；`RegisterChaosTransform` 只跑 Mayhem 且 `IsHextechRelic` 拒绝外部符文。按红线（§0-1）不 patch
+   对方 internal 类 ⇒ **已写进配对文件 `hextech-compat-hextech.md` 的 R4 需求**（`RegisterGuaranteedPlayerRune` 等三种方案），
+   等海克斯作者开放能力后再落地。
+
+---
+
+### 2.12 艾玛专属 3 个联动遗物：已落地（2026-10-01，`publish` EXIT=0，产物已核验）
+
+用户口述三条效果 + 四项裁决（① 「同等效果的组件」按现有组件范式；② 位移 = **累计偏移、长期停留**；
+③ 触发粒度 = **每次变化事件一次**；④ 多人卡 = `CardMultiplayerConstraint.MultiplayerOnly`，
+移除来源 = 手牌 + 抽牌堆 + 弃牌堆）。`HextechRuneCatalog.All` 追加 3 条 `typeof(Emalin)` 的 spec（注册桥未改，数据驱动）。
+
+#### 10. `HextechWitchFactorErosion`（魔女因子侵蚀）
+
+敌方阵营回合开始时，每个带 `EmaWitchFactorPower` 的敌人按**自身层数**受等量伤害。
+
+- 触发点 `AfterSideTurnStart(CombatSide, IReadOnlyList<Creature>, ICombatState)`，判 `side != Owner.Creature.Side`
+  （多人下队友与自己同侧 ⇒ 队友回合不会误触发）。
+- 伤害走 `CreatureCmd.Damage(choiceContext, enemy, stacks, ValueProp.Unpowered, null, null)`（可被格挡、不吃力量）。
+
+#### 11. `HextechTrialEmbodiment`（审判具现）
+
+让持有者的卡**可以同时拥有多个不同名的附魔**。
+
+- ⭐ **2026-10-02 用户裁决改为「全部转换」**（推翻此前的「第 1 个附魔留在卡上作代表附魔」）：
+  卡上获得的附魔**全部**具现进卡里（`EnchantmentEmbodimentComponent`）⇒
+  卡牌附魔槽的**真槽位**（`<Enchantment>k__BackingField`）**恒为空** ⇒
+  **卡面上不再使用引擎的附魔显示框**，且同一张牌还能继续被附魔。
+- ⭐⭐ **2026-10-02 第二轮（用户第二次数落：「审判具现的行为只由遗物自己实现，与艾玛有 p 关系，
+  而且你这样艾玛用也没用」）⇒ 读取侧改为「属性级读取桥」**：
+  给 `CardModel.get_Enchantment` 打 **Postfix**（`Patches/HextechTrialEmbodimentBridge.cs`），
+  真槽位为空而卡里有具现附魔时**返回第 1 条具现附魔**（**已 `ApplyInternal` 绑回本卡**）。
+  ⇒ 全游戏任何读 `card.Enchantment` 的代码（**引擎自己 / 任何角色 / 任何第三方模组**）都无需改动，
+  **不再需要逐个去改读取方**。此前「改艾玛 25 处 + 其它角色 6 处」的做法**已全部回滚**
+  （艾玛 19 个文件用 `git checkout` 精确还原，`Data.cs` 只退掉附魔那两句、保留便签条升级改动）。
+- ⭐ **为什么桥只交出一条**：`card.Enchantment` 是**单值**属性，引擎的数值 / 打出 / 打出次数 / 悬浮
+  也都只读它一次 ⇒ 第 1 条由引擎经桥自己结算，**第 2 条起**才由遗物补算：
+  - 数值：`Patches/EnchantmentReadPatches.cs` 走 `EffectiveEnchantments.BeyondPrimary(card)`；
+  - 打出：组件 `OnPlayPostfix`；打出次数：组件 `ModifyCardPlayCount`；悬浮：组件 `HoverTips`（跳过第 1 条，否则重复）。
+- ⭐ **桥必须被临时关掉、只看真槽位的 5 处**（`EmbodiedEnchantmentBridge.Enter/Exit`，Prefix 进 Postfix 出、嵌套安全）：
+  `CardModel.ToSerializable`（否则具现附魔会**写进存档的真槽位**）、
+  `CardModel.DeepCloneFields`（否则克隆体会**同时**有真附魔 + 具现附魔）、
+  `CardModel.DowngradeInternal`（它调 `Enchantment?.ModifyCard()`，未绑卡的具现实例会抛）、
+  `EnchantmentModel.CanEnchant`（引擎「一卡一附魔」判定点，必须看到真槽位为空）。
+  同类「必须看真槽位」的语义一律走 `EffectiveEnchantments.Raw(card)`（backing field 的 `FieldRefAccess`，
+  已实测 `sts2.dll` 里存在 `<Enchantment>k__BackingField` 这个字段名）。
+- ⭐ **写回 `Amount`**：桥交出的是**临时实例**，而引擎 / 卡牌会直接写 `card.Enchantment.Amount`
+  （艾玛审判徽章的计数回写 `card.Enchantment.Amount = _agreeCount`、原版 `Goopy` 的 `Amount++`）⇒
+  `EnchantmentModel.set_Amount` 后置补丁把写入落回组件 `SavedCards`（组件 `WriteBackAmount`），
+  否则「和真挂在卡上一模一样」是假象。
+- ⭐ **卡面表现**：桥接了之后引擎会把附魔标签页显示出来 ⇒ `NCard.UpdateEnchantmentVisuals` 后置补丁把
+  **具现实例**的标签页藏掉；`EnchantmentModel.get_DynamicExtraCardText` 后置补丁把具现实例的额外文字掐成 null
+  （这两样都属于用户明确不要的「正常附魔显示框」）。
+- ⭐ **`CardCmd.ClearEnchantment` 也要能清掉具现的**：`CardModel.ClearEnchantmentInternal` 后置补丁 →
+  组件 `ClearAll()` + 刷新卡面（否则「清旧附魔」会变成空操作、卡面名字还留着）。
+- 卡面的替代显示（用户原话「转换过的附魔在卡牌上面显示附魔名字就行了，然后自带附魔效果悬浮框」）：
+  - **名字**：补丁 `CardModel.GetDescriptionForPile`（私有实现重载）把具现附魔的
+    `enchantments` 表 `<Id>.title` 拼到描述末尾（`[purple]【A】【B】[/purple]`）；
+  - **效果**：组件的 `HoverTips`（每个具现附魔一条 `HoverTip`）。
+- ⚠️ **代价：引擎的附魔数值加成只会算到「第 1 条」**（它读单值的 `card.Enchantment`，值由读取桥交出）——
+  其余条数必须由遗物补算；这些读取点是：
+
+  | 引擎读取点 | 作用 |
+  |---|---|
+  | `Hook.ModifyDamage`（`Hook.cs:1503`）/ `Hook.ModifyBlock`（`:1329`） | **实际战斗**的伤害 / 格挡加成 |
+  | `BlockVar` / `CalculatedBlockVar` / `DamageVar` / `CalculatedDamageVar` / `ExtraDamageVar` / `OstyDamageVar` 的 `UpdateCardPreview` | 卡面数字预览 |
+  | `CardModel.GetDescriptionForPile`（`:1405` `Enchantment?.DynamicExtraCardText`） | 卡面附魔文字 |
+
+  接法见 `Patches/EnchantmentReadPatches.cs`：**Hook 用 Prefix 注入形参**（在引擎 `num = damage` 之前，
+  ⇒ 实际战斗数值**精确**等价于「附魔还挂在卡上」）；**DynamicVar 用 Postfix 补算** PreviewValue/EnchantedValue
+  （加法/乘法口径与引擎一致，只是排在 hooks 之后 ⇒ 属**显示值**，可接受）。
+  ⚠️ `ExtraDamageVar` 没有 `Props`（引擎对它硬编码 `ValueProp.Move`），且**只吃乘算** ⇒ 单独处理。
+- ⭐ **读取侧由「属性层面的桥」统一解决，不再动任何 mod 业务代码** —— 因此艾玛自己的那批判定
+  （`EmalinCombatHelper` 的 5 个统计、`FinalJudgment`、`EmaForgottenOne`、`Emadeath`、`SmallKey`、`Data`、
+  `StabbingBlade`、`Emamonv`、`Emamlym`、`Witchfactorechantcard`、`EnchantTransform`、`Trialenchantcyclepower`、
+  `Randomtrialenchantpower`、`EnchantmentConvergencePower`、`JointJudgmentPower`、`PrisonBlueprintPower`、
+  `TrueCriminalPower`、`WitchTrialPower`、`EmaTrialBadge`）**全部保持原样**，靠桥就能正确工作：
+  - `card.Enchantment is Rebuttal or Agreement or Doubt` 之类的**类型判定**现在能命中（桥交出第 1 条）；
+  - `card.Enchantment.Amount = n` 之类的**写入**经 `set_Amount` 补丁落回卡里（见上）；
+  - `card.Enchantment != null` / `== null` 之类的**有无判定**也正确（桥只在卡内确有具现附魔时才交出值）。
+  ⚠️ **唯一的语义上限**：属性是单值的 ⇒ 那些代码**只看得见第 1 条**具现附魔。一张牌同时挂多条**审判**
+  附魔时，`WitchTrialPower` 之类的"逐条计数"只会数到第 1 条。这是「不改读取方」这条约束的必然代价，
+  不是 bug（要突破就得回到"逐个改读取方"，已被用户否决）。
+
+**统一读取器** `Extensions/EffectiveEnchantments.cs`：
+`Of`（真附魔 + 具现附魔）/ `BeyondPrimary`（引擎不管的那部分 = 第 2 条起）/ `Raw`（真槽位）/
+`Has` / `Has<T>` / `Count` / `OfTrial` / `FindComponent` / `MarkEmbodied`（登记桥接实例）/
+`IsEmbodiedInstance`。没装遗物时退化为引擎原行为（零行为变化）。
+
+**补丁点**：`Patches/HextechTrialEmbodimentPatch.cs` → `CardCmd.Enchant(EnchantmentModel, CardModel, decimal)` 的 **Prefix**
+（泛型 `Enchant<T>` 内部转调它 ⇒ 只打这一处）。**必须前置** —— 原逻辑的 `CanEnchant` 会先把第二格拒掉，Postfix 太晚。
+
+**补丁点 2**：`EnchantmentModel.CanEnchant` 的 **Postfix**（`HextechTrialEmbodimentCanEnchantPatch`）。
+- 起因（2026-10-02 用户实测反馈）：事件「自助指南」（`SelfHelpBook`，读封底/读段落/读全书 = 给攻击/技能/能力牌附
+  Sharp/Nimble/Swift +2）**选不到已附魔的卡**。根因 = 选牌走 `CardSelectCmd.FromDeckForEnchantment`
+  用 `enchantment.CanEnchant(c)` 过滤（`CardSelectCmd.cs:660`），而 `CanEnchant` 末段
+  「`card.Enchantment != null` && (!IsStackable ‖ 类型不同) ⇒ false」（`EnchantmentModel.cs:289`）
+  **就是「一卡一附魔」的判定点** ⇒ 卡在**过滤阶段**就被筛掉，根本走不到 `CardCmd.Enchant`。
+- ⚠️ **加上读取桥之后**：`card.Enchantment` 会返回第 1 条具现附魔 ⇒ 这个判定点会**无条件拒绝**已经具现过附魔的卡。
+  所以本补丁改成 **Prefix 关桥 + Postfix 判同名**：关桥后引擎看到「真槽位为空」自然放行；
+  Postfix 只剩拦「同名」（卡内已具现过同名 ⇒ 拒绝，保持「同名只能一个、不堆叠」）。另外兼容旧存档：
+  真槽位还残留附魔时也放行（第 2 条会被具现进卡里）。
+- ⚠️ 子类 override 的 `CanEnchant`（如 `Nimble` = `base.CanEnchant(card) && card.GainsBlock`）内部都调 `base`，
+  所以打在基类上有效，**各附魔自己的附加条件仍然生效**。
+
+**拦截逻辑**（`HextechTrialEmbodiment.TryEmbodify`）：
+
+| 情形 | 处理 |
+|---|---|
+| 该玩家没装遗物 | **不拦截** ⇒ 照常挂在卡上（引擎原行为，零影响） |
+| 卡上残余的真附魔与它同名（旧存档） | 直接丢弃（不堆叠），返回 `null` |
+| 卡内已具现的某条同名 | 直接丢弃，返回 `null` |
+| 其余（**含第 1 条**） | 全部封进卡里那张「只带附魔的卡」 |
+
+**组件** `Characters/Ema/Components/EnchantmentEmbodimentComponent.cs`
+（⚠️ 只是**文件放在** `Characters/Ema/Components/` 下 —— 它属于审判具现，与艾玛角色本身无关；
+当初是跟着「艾玛专属 3 遗物」一起建的）：
+
+- `[ComponentState] List<SerializableCard> SavedCards` —— 每条 = 一张载体卡
+  （`Id` 取主卡自己、`Enchantment` 挂附魔），形态与 `GenerateComponent` 的「内嵌一张卡」同构。
+- `GetEmbodiedEnchantments()` **带缓存**（`_embodied`）——
+  ⚠️ **必须有**：读取器被挂在**每次伤害 / 格挡计算**的热点路径上（`Hook.ModifyDamage` 等），
+  每次 `FromSerializable` 重建模型会明显掉帧。
+- `GetBridgeEnchantment()` —— 交给读取桥的**第 1 条**，且**已 `ApplyInternal` 绑回本卡**
+  （引擎处处假定 `EnchantmentModel.Card` 非空，例如 `Adroit.OnPlay` 要用它取 Owner）；单独缓存 `_boundBridge`。
+- `WriteBackAmount(instance, amount)` —— 由 `EnchantmentModel.set_Amount` 后置补丁调用，把对桥接实例的写入落回 `SavedCards`。
+- `InvalidateCaches()` —— `SavedCards` 一有变化就把三个缓存（`_hoverTips` / `_embodied` / `_boundBridge`）全部作废。
+- `OnPlayPostfix`：只遍历 `EffectiveEnchantments.BeyondPrimary(card)`（**第 2 条起**），
+  逐个 `ApplyInternal` + **借附魔本体跑同一份 `OnPlay`** + `finally ClearInternal()`
+  —— 第 1 条已由引擎那句 `Enchantment.OnPlay` 经桥结算，重复处理会**打两次**。
+- `ModifyCardPlayCount`：同样只补第 2 条起的 `EnchantPlayCount`
+  （引擎的 `GetEnchantedReplayCount`（`CardModel.cs:1132`）经桥已经算过第 1 条）。
+- `HoverTips` = 「【附魔具现】」标题 tip + 第 2 条起每个具现附魔的 `HoverTip`
+  （第 1 条由引擎经桥给出，再列一次就重复；经 `ComponentsCardModel.ExtraHoverTips` 并入卡牌悬浮；
+  包 try-catch 防对方模组卸载时炸）。
+- `SyncTrialAmounts(agreement, rebuttal, doubt)` —— 直接改 `SavedCards` 里那条
+  `SerializableEnchantment.Amount` 的入口（艾玛侧的 `EmaTrialBadge` **没有**调用它，
+  那边走的是「写 `card.Enchantment.Amount` + `set_Amount` 写回」这条通用路径）。
+- `ClearAll()` —— 由 `CardModel.ClearEnchantmentInternal` 的后置补丁调用。
+- `TryMergeWith` 按 `Enchantment.Id.Entry` 去重（**同名只能一个、不堆叠**）。
+
+**本地化键**：遗物 `MANOSABA_LIN_RELIC_HEXTECH_TRIAL_EMBODIMENT.*`；组件 `cards` 表
+`ManosabaLin.EnchantmentEmbodimentComponent.hovertip.title / .description`。
+
+> ⭐⭐ **铁律（2026-10-02 用户两次裁决；第二次原话：「审判具现的行为只由遗物自己实现，与艾玛有 p 关系，
+> 而且你这样艾玛用也没用」）**：
+> **本遗物的行为只能在它自己的代码里实现 —— 一处都不去改其它 mod 业务代码。** 属于它的文件只有这 6 个：
+> `Characters/Common/LinRelics/HextechTrialEmbodiment.cs`、
+> `Characters/Ema/Components/EnchantmentEmbodimentComponent.cs`（组件；⚠️ 只是**文件放在** `Characters/Ema/` 下，
+> 它属于审判具现、与艾玛角色无关）、`Patches/HextechTrialEmbodimentPatch.cs`、
+> `Patches/HextechTrialEmbodimentBridge.cs`、`Patches/EnchantmentReadPatches.cs`、
+> `Extensions/EffectiveEnchantments.cs`。
+>
+> - ⚠️ **艾玛自己的卡与 Power（`Characters/Ema/**`）也不算「遗物自己的代码」**（2026-10-02 第二轮裁决）：
+>   第一轮曾把艾玛 25 处 + 其它角色 6 处（`Mlym`/`YalisalinMlym`/`AnanlinMlym`/`SherrylinMlym` 的
+>   `CanBeExchanged`、`Bloodiedclothing` 的技能牌筛选、`AnansSketchbook.CopyVisibleAdditions`）
+>   改成 `EffectiveEnchantments` —— **全部被否决并回滚**。
+>   读取侧现在靠**属性层面的桥**（`CardModel.get_Enchantment`）统一解决 ⇒ 那些文件**不需要也不允许**再改。
+> - ✅ 允许的是**给引擎方法打补丁**（`CardModel` / `EnchantmentModel` / `NCard` / `Hook`）——
+>   那正是「遗物自己完成的适配」，且只 patch 引擎，不碰任何 mod 业务代码。
+> - ⚠️ 这条约束的必然代价：`card.Enchantment` 是**单值**属性 ⇒ 别的代码只看得见**第 1 条**具现附魔。
+>   要突破就得回到"逐个改读取方"，已被用户否决 ⇒ 不再尝试。
+
+#### 12. `HextechBondDrift`（羁绊漂移）
+
+亲近/疏远变化 ⇒ 模型产生**累计、长期停留**的左右偏移；左移给队友多人卡，右移移除一张并给减费。
+
+- **变化观测**（`Patches/HextechBondDriftPatches.cs`）：patch `BondPower.set_Affinity` / `set_Estrangement`。
+  ⚠️ 不能借 `Yalisabond.ApplyBondDeltaAsync` —— 两个 setter 只在 `delta > 0` 时才调它，**减少时没有任何回调**。
+- **防读档误触发**：`SavedProperties.FillInternal` 用 `PropertyInfo.SetValue` ⇒ 恢复会走 setter。
+  所以基线（`LastAffinity` / `LastEstrangement` + 两侧各一个 `*BaselineSet`）**随遗物 `[SavedProperty]` 存档** ⇒
+  恢复后 delta = 0；新遗物首次观察只对齐基线不触发。
+- **位移**：改 `NCreature.Position`（`Visuals.Position` 会被受击抖动 `AnimShake` 清零）。
+  因 `NCombatRoom.PositionPlayersAndPets`（static）每次重排都会覆盖，故 patch 它的 Postfix 把**绝对偏移**叠回去；
+  事件发生时用**增量**叠加 ⇒ 两者自洽。偏移 = `Estrangement − Affinity`，`StepPerPoint = 40f`（左 = 负 x）。
+  ⚠️ 2026-10-02 实测反馈「移动太不明显，只看得出动了一点」⇒ 由 `12f` 调到 `40f`（12f 时 1 点只有 12px，1920 宽屏上看不出来）。
+- **左移**（`HextechBondDriftEffects.OnShiftedLeft`）：每个队友各拿到一张其卡池的 MultiplayerOnly 卡
+  （`RunState.Rng.CombatCardGeneration` + `combatState.CreateCard` + `CardPileCmd.AddGeneratedCardToCombat`）。
+- **右移**（`OnShiftedRight`）：从所有队友三堆里随机移除一张 MultiplayerOnly（`RunState.Rng.CombatCardSelection`
+  + `CardPileCmd.RemoveFromCombat`），成功后给其主人挂 1 层 `HextechMultiplayerDiscountPower`
+  （Counter 可叠加；`TryModifyEnergyCostInCombat` 只对 MultiplayerOnly 生效；`BeforeCardPlayed` 打出即整层移除）。
+
+> 本地化：5 语言 × `relics.json`（3 遗物 × title/description/flavor）、`powers.json`（减费能力）、
+> `cards.json`（组件 hovertip）；80 个 localization JSON 全部 `json.loads(utf-8-sig)` 通过。
+> 产物核验：DLL 内 10 个新类型名全部命中；PCK 内抽样键各命中 5 次（5 语言）。
 
 ---
 

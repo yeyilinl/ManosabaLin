@@ -22,15 +22,23 @@ public sealed class WeightOfPainPower : ManosabaPowerTemplate
     protected override IEnumerable<DynamicVar> CanonicalVars =>
         [new IntVar("Threshold", DefaultThreshold)];
 
+    /// <summary>
+    ///     描述随「阈值是否已被升级牌降到 1」切键（升级也是一种达成条件）。数值本身由 <c>{Threshold}</c>
+    ///     动态变量给出，这里只按状态切键。两侧通道都切，做法对齐「共犯」/ 被缚的普罗米修斯。
+    /// </summary>
     public override LocString Description
     {
         get
         {
-            var description = base.Description;
+            var description = new LocString("powers",
+                CurrentThreshold <= 1 ? $"{Id.Entry}.descriptionEnhanced" : $"{Id.Entry}.description");
             description.Add(new IntVar("Threshold", CurrentThreshold));
             return description;
         }
     }
+
+    protected override string SmartDescriptionLocKey =>
+        CurrentThreshold <= 1 ? $"{Id.Entry}.smartDescriptionEnhanced" : $"{Id.Entry}.smartDescription";
 
     private int CurrentThreshold => Threshold <= 0 ? DefaultThreshold : Threshold;
 

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using ManosabaLin.Characters.Sherrylin.Cards.Emotions;
 using ManosabaLin.Characters.Sherrylin.Orbs;
@@ -16,6 +17,7 @@ using MegaCrit.Sts2.Core.GameActions.Multiplayer;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Powers;
 using MegaCrit.Sts2.Core.MonsterMoves.Intents;
+using MegaCrit.Sts2.Core.Rooms;
 using MegaCrit.Sts2.Core.ValueProps;
 using STS2RitsuLib.Interop.AutoRegistration;
 
@@ -75,6 +77,26 @@ public sealed class HextechEmotionOverflow : ManosabaRelicTemplate
         if (player != Owner) return Task.CompletedTask;
 
         HangingEmotionOrbs.Release(player);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    ///     战斗结束 ⇒ 清空**所有**玩家挂着的持续型情绪球。
+    ///     <para>
+    ///         ⚠️ 只靠 <see cref="AfterPlayerTurnStart" /> 的 <c>Release</c> 不够：球还挂着战斗就结束、
+    ///         或持有者阵亡时登记表不会清 ⇒ 显示层画**幻影挂位**、跨 run 泄漏内存。
+    ///     </para>
+    ///     <para>
+    ///         这条钩子可靠：<c>Hook.AfterCombatEnd</c> 用
+    ///         <c>runState.IterateHookListeners(combatState)</c> 派发，而
+    ///         <c>CombatState.IterateHookListeners</c> 会把每个玩家的遗物都加进监听者
+    ///         （<c>CombatState.cs:429-436</c>）；且它跑在战斗态被拆掉之前。
+    ///         <see cref="HangingEmotionOrbs.ReleaseAll" /> 幂等，多人下各端各调一次没有副作用。
+    ///     </para>
+    /// </summary>
+    public override Task AfterCombatEnd(CombatRoom room)
+    {
+        HangingEmotionOrbs.ReleaseAll();
         return Task.CompletedTask;
     }
 
@@ -147,10 +169,12 @@ public sealed class HextechEmotionOverflow : ManosabaRelicTemplate
             }
 
             // 只能打「激发的这个人」——即便原意图是 AOE，这里也只把伤害指向你。
-            await DamageCmd.Attack(incoming)
-                .FromMonster(monster)
-                .Targeting(Owner.Creature)
-                .Execute(choiceContext);
+            // ⚠️ 不用 DamageCmd.Attack(...).FromMonster(monster).Targeting(...)：
+            //    FromMonster 内部已 TargetingAllOpponents（设了 _combatState），再 Targeting 必抛
+            //    "Already set to target opponents of attacker"，导致整条 play 崩掉（反伤不结算 + 新球被吞）。
+            //    改用 CreatureCmd.Damage 直接造成 incoming 真实承伤（受格挡/能力影响，不提前播怪物攻击动画，
+            //    怪物到它自己回合照常攻击）。
+            await CreatureCmd.Damage(choiceContext, Owner.Creature, incoming, ValueProp.Move, null, null);
 
             // 只补「记录」与首动标记：不碰 NextMove ⇒ 敌人原本意图不变。
             monster.MoveStateMachine?.OnMovePerformed(move);
@@ -313,31 +337,43 @@ internal static class EmotionOverflowRules
     /// </summary>
     public static bool IsPersistent(CardModel? emotionCard)
         => emotionCard is EmotionSadness or EmotionAnger or EmotionJoy or EmotionMelancholy
-            or EmotionElation or EmotionCuriosity or EmotionFriendship;
+            or EmotionElation or EmotionCuriosity or EmotionFriendship or WitchificationEmotion;
+
+    /// <summary>
+    ///     有「溢出结算」的情绪卡 —— 被挤出球位时由 <see cref="HextechEmotionOverflow" /> 手工复刻一次收益。
+    ///     <para>反伤型：厌恶 / 骇厌；延迟型：恐惧 / 惊讶 / 恼惧 / 凄惶 / 无助。</para>
+    /// </summary>
+    public static bool HasOverflowPayout(CardModel? emotionCard)
+        => emotionCard is EmotionDisgust or EmotionHorrorDisgust
+            or EmotionFear or EmotionSurprise or EmotionIrritatedFear
+            or EmotionDesolate or EmotionHelplessness;
 }
 
 /// <summary>
 ///     「这个球是不是刚被挤出去的」的记账。
 ///     <para>
 ///         挤出标记由 <c>HextechOrbOverflowPatch</c> 在 <c>OrbCmd.Channel</c> 发现球位已满、
-///         且队首是「非持续型」情绪球时打上；<see cref="HextechEmotionOverflow" /> 在
-///         <c>AfterOrbEvoked</c> 里取走。用「取走即清空」的语义，避免同一标记被后续无关的激发重复消费。
+///         且队首是<b>有溢出结算</b>（<see cref="EmotionOverflowRules.HasOverflowPayout" />）的情绪球时打上；
+///         <see cref="HextechEmotionOverflow" /> 在 <c>AfterOrbEvoked</c> 里取走。
 ///     </para>
 ///     <para>
 ///         ⚠️ 之前那套「给持续型多开一格（<c>OrbCmd.AddSlots</c>）+ 球消散时归还」的记账已删除
 ///         （用户 2026-09-29 裁定要的是**脱离球位**，不是占着球位不让出去）。
 ///     </para>
+///     <para>
+///         ⚠️ 之前用**单槽静态字段**记账：<c>MarkSqueezedOut</c> 会覆盖、<c>TryTakeSqueezedOut</c>
+///         未命中也会清空 —— 结果要么把「新球的正常激发」误判成「被挤出」（吞卡），要么标记被无关球消费掉
+///         （厌恶/骇厌/延迟形「没效果」）。改用 <see cref="ConditionalWeakTable" /> 按引用记账后：
+///         多球不互踩、未命中不清空、命中才消费。
+///     </para>
 /// </summary>
 internal static class HextechOrbEvokeRules
 {
-    private static OrbModel? _squeezedOutOrb;
+    private static readonly ConditionalWeakTable<OrbModel, object> SqueezedOut = new();
 
-    public static void MarkSqueezedOut(OrbModel orb) => _squeezedOutOrb = orb;
+    public static void MarkSqueezedOut(OrbModel orb)
+        => SqueezedOut.GetValue(orb, static _ => new object());
 
     public static bool TryTakeSqueezedOut(OrbModel orb)
-    {
-        var matched = ReferenceEquals(_squeezedOutOrb, orb);
-        _squeezedOutOrb = null;
-        return matched;
-    }
+        => SqueezedOut.Remove(orb);
 }

@@ -70,9 +70,25 @@ Only add extra keys actually used by the code, such as `selectionScreenPrompt`, 
 
 Do not edit generated `.uid` files.
 
+## Card frame (装饰卡框)
+
+The decorative character frame is applied by `ManosabaLinCode/Patches/CharacterCardFramePatch.cs`
+(`NCard.Reload` postfix) and **its owner character is derived from the card class's namespace**, not its
+physical folder and not its `CardPool`. Namespace segment after `Characters` ⇒ character
+(`ManosabaLin.Characters.Hiro.Cards` ⇒ `Hiro`), then it looks for
+`images/characters/{Character|Characterlin}/{stem}.png` where stem is `{character}`/`{character}lin` ×
+`card.png`/`_card.png` (e.g. `Ema` ⇒ `Emalin/emalincard.png`, `Hiro` ⇒ `Hiro/hirolincard.png`).
+
+- **Wrong frame on a card?** Almost always a copy-pasted `namespace` on the card file. Fix the namespace to
+  match the owning character (physical folder) — that also fixes `AudioEventPathProvider.CardHomeName`.
+- **One-off frame, same character folder** → add `[typeof(MyCard)] = "mystem"` to `ExclusiveFrameStems`.
+- **Frame living in another character's folder** (e.g. a Sherry card class placed under `Hiro`) → add
+  `[typeof(MyCard)] = ("Sherrylin", "sherrylincard")` to `CrossDirectoryFrames`.
+- **No decorative frame at all** → add the type to `NoFrameCards` (the engine's own Ancient/etc. frame still shows).
+
 ## Checks
 
 - Search for nearby cards in the same character before inventing patterns.
 - Keep localization keys structurally aligned across `eng`, `zhs`, and `jpn`.
-- Run `dotnet build ManosabaLin.sln`.
+- Build with `dotnet build ManosabaLin.csproj` (never the `.sln`); deploy with `dotnet publish ManosabaLin.csproj`.
 - If JSON changed, parse the touched localization files.

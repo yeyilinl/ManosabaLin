@@ -10,7 +10,7 @@ namespace ManosabaLin.Characters.Yalisalin.Cards;
 /// 升级：改为选 4 张。
 /// </summary>
 [RegisterCard(typeof(YalisalinCardPool))]
-public sealed class SinMarket() : ManosabaCardTemplate(2, CardType.Skill, CardRarity.Rare, TargetType.Self)
+public sealed class SinMarket() : ManosabaCardTemplate(1, CardType.Skill, CardRarity.Rare, TargetType.Self)
 {
     protected override IEnumerable<DynamicVar> CanonicalVars =>
     [

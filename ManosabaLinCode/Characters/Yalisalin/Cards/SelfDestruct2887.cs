@@ -10,7 +10,7 @@ namespace ManosabaLin.Characters.Yalisalin.Cards;
 /// </summary>
 [RegisterCard(typeof(YalisalinCardPool))]
 public sealed class SelfDestruct2887()
-    : ManosabaCardTemplate(2, CardType.Attack, CardRarity.Rare, TargetType.AllEnemies)
+    : ManosabaCardTemplate(1, CardType.Attack, CardRarity.Rare, TargetType.AllEnemies)
 {
     private const int BaseDamagePerCard = 6;
     private const int BaseCardsPerSuccessor = 2;

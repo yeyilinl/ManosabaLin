@@ -1,7 +1,6 @@
 using MinionLib.Component.Core;
 using ManosabaLin.Characters.Common;
 using ManosabaLin.Characters.Common.HiroKeywords;
-using ManosabaLin.Characters.Hiro.Powers;
 using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.GameActions.Multiplayer;
@@ -20,19 +19,15 @@ public sealed class CardSeventyFive : ManosabaCardTemplate
     {
     }
 
+    public override bool GainsBlock => true;
+
     public override IEnumerable<CardKeyword> CanonicalKeywords =>
         [TransmigrationRules.TransmigrationCardKeyword];
 
-    protected override IEnumerable<IHoverTip> AdditionalHoverTips
-    {
-        get { yield return HoverTipFactory.FromPower<PerjuryPower>(); }
-    }
-
-    // 固定基础值
     protected override IEnumerable<DynamicVar> CanonicalVars =>
     [
         new DamageVar(7m, ValueProp.Move),
-        new PowerVar<PerjuryPower>(1m)
+        new BlockVar(1m, ValueProp.Move)
     ];
 
     protected override async Task OnPlay(PlayerChoiceContext choiceContext, CardPlay cardPlay, ComponentContext componentContext)
@@ -51,20 +46,24 @@ public sealed class CardSeventyFive : ManosabaCardTemplate
             .WithHitFx("vfx/vfx_attack_slash")
             .Execute(choiceContext);
 
-        // 获得 PerjuryPower
-        await PowerCmd.Apply<PerjuryPower>(
-            choiceContext,
-            source.Owner.Creature,
-            source.DynamicVars["PerjuryPower"].BaseValue,
-            source.Owner.Creature,
-            source,
-            false
-        );
+        // 卡面：「当前【抽牌堆】每有一张【轮回】卡获得 N 点格挡」
+        var rebirthInDraw = PileType.Draw.GetPile(source.Owner).Cards
+            .Count(TransmigrationRules.HasTransmigration);
+
+        if (rebirthInDraw > 0)
+        {
+            await CreatureCmd.GainBlock(
+                source.Owner.Creature,
+                source.DynamicVars.Block.BaseValue * rebirthInDraw,
+                ValueProp.Move,
+                cardPlay);
+        }
     }
 
     protected override void OnUpgrade(ComponentContext componentContext)
     {
+        // 升级保留伤害升级，同时每张轮回卡获得的格挡 1 → 2。
         DynamicVars.Damage.UpgradeValueBy(3m);
-        DynamicVars["PerjuryPower"].UpgradeValueBy(1m);
+        DynamicVars.Block.UpgradeValueBy(1m);
     }
 }

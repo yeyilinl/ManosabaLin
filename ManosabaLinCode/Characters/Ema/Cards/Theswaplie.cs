@@ -56,8 +56,12 @@ public sealed class Theswaplie : ManosabaCardTemplate
 
             handCards.Remove(original);
 
+            // ⚠️ 变形必须**保持原卡的稀有度**：只从与原卡同稀有度的本角色卡池里抽，
+            //    否则会出现「普通牌一变形变成稀有牌」这种稀有度错位（用户 2026-10-02 反馈）。
+            //    同时排除不可在战斗内生成的卡（Token/Status/Curse/Quest 等）。
             var poolCards = Owner.Character.CardPool.AllCards
-                .Where(c => c.Rarity != CardRarity.Basic)
+                .Where(c => c.Rarity == original.Rarity && c.Rarity != CardRarity.Basic)
+                .Where(static c => c.CanBeGeneratedInCombat)
                 .ToList();
 
             if (poolCards.Count == 0) continue;

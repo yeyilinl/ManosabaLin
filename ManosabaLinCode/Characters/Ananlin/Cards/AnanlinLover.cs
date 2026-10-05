@@ -60,6 +60,10 @@ public sealed class AnanlinLover() : ManosabaCardTemplate(4, CardType.Power, Car
             var block = sketchbook.CurrentSilence * DynamicVars[BlockPerSilenceKey].IntValue;
             if (block > 0)
                 await CreatureCmd.GainBlock(Owner.Creature, block, ValueProp.Move, cardPlay);
+
+            // 卡面：「将【缄默】意图替换池数值翻倍」⇒ 缄默成长值翻倍（池基础加成 ×2）
+            AnanlinSilenceIntentManager.IncreaseSilenceGrowth(
+                Owner, AnanlinSilenceIntentManager.GetSilenceGrowth(Owner));
         }
     }
 
@@ -74,19 +78,7 @@ public sealed class AnanlinLover() : ManosabaCardTemplate(4, CardType.Power, Car
 
         var generated = RollRarePlayableFromEachRecordedPool(sketchbook, combatState);
         foreach (var card in generated)
-        {
-            if (await this.LosePeaceOfMind(choiceContext) > 0)
-            {
-                card.SetFreeIgnoringCardPlayConditions();
-                card.GetOrCreateCapability<AnanlinLoverDoublePlayCapability>();
-            }
-            else
-            {
-                card.EnergyCost.AddThisTurnOrUntilPlayed(-1, reduceOnly: true);
-            }
-
             await CardPileCmd.AddGeneratedCardToCombat(card, PileType.Hand, Owner);
-        }
     }
 
     private IReadOnlyList<CardModel> RollRarePlayableFromEachRecordedPool(
@@ -95,19 +87,15 @@ public sealed class AnanlinLover() : ManosabaCardTemplate(4, CardType.Power, Car
     {
         var cards = new List<CardModel>();
         var usedIds = new HashSet<ModelId>();
-        var simulatedPeace = this.PeaceOfMindAmount();
 
-        foreach (var pool in sketchbook.GetRecordedCardPools().Take(MaxGeneratedCards))
+        // 卡面：「每有1个已记录卡池生成1张已记录卡池的稀有牌」（不再受张数上限限制）
+        foreach (var pool in sketchbook.GetRecordedCardPools())
         {
-            var willSpendPeace = simulatedPeace > 0;
-            var card = RollRarePlayableFromPool(sketchbook, pool, combatState, willSpendPeace, usedIds);
+            var card = RollRarePlayableFromPool(sketchbook, pool, combatState, usedIds);
             if (card is null) continue;
 
             cards.Add(card);
             usedIds.Add(card.Id);
-
-            if (willSpendPeace)
-                simulatedPeace--;
         }
 
         return cards;
@@ -117,7 +105,6 @@ public sealed class AnanlinLover() : ManosabaCardTemplate(4, CardType.Power, Car
         AnansSketchbook sketchbook,
         CardPoolModel pool,
         ICombatState combatState,
-        bool willSpendPeace,
         ISet<ModelId> usedIds)
     {
         var rng = Owner.RunState.Rng.CombatCardGeneration;
@@ -132,21 +119,12 @@ public sealed class AnanlinLover() : ManosabaCardTemplate(4, CardType.Power, Car
         foreach (var template in candidates)
         {
             var probe = combatState.CreateCard(template, Owner);
-            ApplyPlayabilityProbeModifier(probe, willSpendPeace);
             if (!IsCurrentlyPlayable(probe, combatState)) continue;
 
             return combatState.CreateCard(template, Owner);
         }
 
         return null;
-    }
-
-    private static void ApplyPlayabilityProbeModifier(CardModel card, bool willSpendPeace)
-    {
-        if (willSpendPeace)
-            card.SetFreeIgnoringCardPlayConditions();
-        else
-            card.EnergyCost.AddThisTurnOrUntilPlayed(-1, reduceOnly: true);
     }
 
     private static bool IsCurrentlyPlayable(CardModel card, ICombatState combatState)

@@ -1,5 +1,9 @@
 using Godot;
 using HarmonyLib;
+using ManosabaLin.Characters.Ananlin.Cards;
+using ManosabaLin.Characters.Ema.Cards;
+using ManosabaLin.Characters.Hiro.Cards;
+using ManosabaLin.Characters.Sherrylin.Cards.Emotions;
 using MegaCrit.Sts2.Core.Nodes.Cards;
 
 namespace ManosabaLin.Patches;
@@ -28,6 +32,10 @@ namespace ManosabaLin.Patches;
 ///     <para>
 ///         归属按「卡写在哪个角色目录」判定（命名空间），不按卡池：角色目录里挂在共享 <c>LinCardPool</c>
 ///         的卡与 <c>TokenCardPool</c> 衍生卡（后继机、火种）也算该角色的卡。没有对应 png 的角色不叠。
+///     </para>
+///     <para>
+///         卡牌专属卡框：<see cref="ExclusiveFrameStems" /> 登记的卡不用角色通用卡框，改用同角色目录下的
+///         专属贴图（如 <c>images/characters/Ananlin/chaidan.png</c>）；专属图缺失则自动回退角色通用卡框。
 ///     </para>
 /// </remarks>
 [HarmonyPatch(typeof(NCard), "Reload")]
@@ -68,6 +76,49 @@ public static class CharacterCardFramePatch
 
     /// <summary>卡类 → 卡框图路径（null = 该卡不叠），避免每次 Reload 都打资源系统。</summary>
     private static readonly Dictionary<Type, string?> ArtPaths = [];
+
+    /// <summary>
+    ///     卡牌专属卡框：键 = 卡类型，值 = 专属贴图文件名 stem。这些卡的装饰层不用角色通用卡框，
+    ///     改用<b>同角色目录</b>下的 <c>{stem}.png</c>（目录候选与角色通用卡框一致）。命中即止；
+    ///     专属图缺失时自动回退角色通用卡框。
+    /// </summary>
+    private static readonly Dictionary<Type, string> ExclusiveFrameStems = new()
+    {
+        [typeof(AnanlinBombDisposalExpert)] = "chaidan", // 「拆弹专家」
+        [typeof(AnanlinCocoMultiverseMagic)] = "mingding", // 命定之死
+        [typeof(AnanlinFinishedDraft)] = "wangao", // 「完稿」
+        [typeof(MeruruAndEma)] = "mllam", // 梅露露与艾玛
+        [typeof(TheEnd)] = "jieju", // 结局
+        [typeof(LyXl)] = "lyxl", // 蕾雅与希罗
+        // —— 2026-10-03 新增（同角色目录内的专属卡框）——
+        [typeof(EmotionHelplessness)] = "hanna", // 无助（雪莉目录 → hanna.png）
+        [typeof(EmotionFriendship)] = "youyi", // 友谊（雪莉目录 → youyi.png）
+        [typeof(EmaBadEnding)] = "hao", // 「好结局」（艾玛目录 → hao.png）
+        [typeof(EmaTrueEnding)] = "zheng", // 「真结局」（艾玛目录 → zheng.png）
+        [typeof(Yalisaqinjin)] = "wobut", // 我不听，我需要你（艾玛目录 → wobut.png）
+    };
+
+    /// <summary>
+    ///     跨目录卡框：这些卡的归属目录（命名空间）与卡框美术所在目录不同，需要显式指定
+    ///     「目录 + 文件名 stem」。例如希罗目录下的「橘雪莉」「远野汉娜」用 Sherrylin 目录的图。
+    ///     命中即止；图缺失时回退角色通用卡框。
+    /// </summary>
+    private static readonly Dictionary<Type, (string Directory, string Stem)> CrossDirectoryFrames = new()
+    {
+        [typeof(Hnm)] = ("Sherrylin", "hanna"), // 远野汉娜
+        [typeof(Xlm)] = ("Sherrylin", "sherrylincard"), // 橘雪莉
+        [typeof(Xlmk)] = ("Sherrylin", "sherrylincard"), // 橘雪莉
+    };
+
+    /// <summary>
+    ///     不叠角色装饰卡框的卡（例如希罗目录下的三张先古卡）。
+    /// </summary>
+    private static readonly HashSet<Type> NoFrameCards =
+    [
+        typeof(ThirteenWater), // 特雷德基姆
+        typeof(Witchrestceremony), // 魔女安息仪式
+        typeof(WitchBurn), // 魔女灼烧
+    ];
 
     private static void Postfix(NCard __instance)
     {
@@ -127,13 +178,17 @@ public static class CharacterCardFramePatch
             return cached;
 
         string? path = null;
-        foreach (var candidate in ArtPathCandidates(cardType))
-        {
-            if (!ResourceLoader.Exists(candidate))
-                continue;
 
-            path = candidate;
-            break;
+        if (!NoFrameCards.Contains(cardType))
+        {
+            foreach (var candidate in ArtPathCandidates(cardType))
+            {
+                if (!ResourceLoader.Exists(candidate))
+                    continue;
+
+                path = candidate;
+                break;
+            }
         }
 
         ArtPaths[cardType] = path;
@@ -141,11 +196,19 @@ public static class CharacterCardFramePatch
     }
 
     /// <summary>
-    ///     候选路径：目录 <c>{角色}</c> / <c>{角色}lin</c> × 文件名 stem <c>{角色小写}</c> / <c>{角色小写}lin</c>
-    ///     × <c>card.png</c> / <c>_card.png</c>。同一个角色目录里只放一张卡框图，命中即止。
+    ///     候选路径。先试<b>卡牌专属卡框</b>（见 <see cref="ExclusiveFrameStems" />），再试角色通用卡框；
+    ///     目录都用 <c>{角色}</c> / <c>{角色}lin</c>，命中即止（都取不到就不叠）。
+    ///     <para>
+    ///         角色通用卡框的文件名 stem 是 <c>{角色小写}</c> / <c>{角色小写}lin</c> ×
+    ///         <c>card.png</c> / <c>_card.png</c>。同一个角色目录里只放一张，命中即止。
+    ///     </para>
     /// </summary>
     private static IEnumerable<string> ArtPathCandidates(Type cardType)
     {
+        // ⓪ 跨目录卡框优先：归属目录与美术目录不同的卡（如希罗目录的「橘雪莉」用 Sherrylin 的图）。
+        if (CrossDirectoryFrames.TryGetValue(cardType, out var cross))
+            yield return $"{cross.Stem}.png".CharacterImgPath(cross.Directory);
+
         var segments = cardType.Namespace?.Split('.');
         var index = segments is null ? -1 : Array.IndexOf(segments, "Characters");
         if (index < 0 || index + 1 >= segments!.Length)
@@ -153,6 +216,15 @@ public static class CharacterCardFramePatch
 
         var character = segments[index + 1];
         var lower = character.ToLowerInvariant();
+
+        // ① 卡牌专属卡框优先：命中即止，不会再落到角色通用卡框。
+        if (ExclusiveFrameStems.TryGetValue(cardType, out var exclusiveStem))
+        {
+            foreach (var directory in new[] { character, character + LinSuffix })
+                yield return $"{exclusiveStem}.png".CharacterImgPath(directory);
+        }
+
+        // ② 角色通用卡框。
         foreach (var directory in new[] { character, character + LinSuffix })
         {
             foreach (var stem in new[] { lower, lower + LinSuffix })

@@ -19,6 +19,22 @@ public sealed class BoundPrometheusPower : ManosabaPowerTemplate
 
     public override PowerStackType StackType => PowerStackType.Single;
 
+    /// <summary>
+    ///     描述随「是否已锁色」切换：升级牌打出并消耗到火色后才锁色。
+    ///     power 的悬浮说明在引擎里走的是 <c>Description</c>（<c>GetDumbHoverTip</c> 只读它，
+    ///     UI 上的 power tooltip 也用它），所以必须覆写 <c>Description</c> 才能让描述跟着状态变。
+    ///     做法对齐「共犯」（MeruruAndEmaAccomplicePower）。
+    /// </summary>
+    public override LocString Description =>
+        new LocString("powers", LockedColor is null ? $"{Id.Entry}.description" : $"{Id.Entry}.descriptionLocked");
+
+    /// <summary>
+    ///     smart 通道（HoverTips）也按同一状态切键。该键缺失时引擎会自动回退到 <c>Description</c>，
+    ///     所以这里即使不被用到也不会显示错内容。
+    /// </summary>
+    protected override string SmartDescriptionLocKey =>
+        LockedColor is null ? $"{Id.Entry}.smartDescription" : $"{Id.Entry}.smartDescriptionLocked";
+
     public async Task OnFireColorConsumed(PlayerChoiceContext choiceContext, Creature target)
     {
         if (!target.IsAlive)

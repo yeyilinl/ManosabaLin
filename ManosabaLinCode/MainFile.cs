@@ -102,6 +102,12 @@ public partial class MainFile : Node
         // （ModHelper.SubscribeForCombatStateHooks）⇒ 球离开球位后效果照旧、不需要任何能力。
         HangingEmotionOrbs.Register();
 
+        // 审判具现：卡内「具现附魔」也要收战斗钩子 —— 原版不少附魔的效果是靠钩子实现的
+        // （Goopy/Glam/Vigorous 的 AfterCardPlayed、Slither 的 AfterCardDrawn、Imbued 的
+        //  AfterAutoPrePlayPhaseEntered…），附魔离开附魔槽后必须由遗物把它们登记成监听者，
+        // 否则那些效果会静默失效。与 HangingEmotionOrbs 同一套机制。
+        EmbodiedEnchantmentHooks.Register();
+
         // 海克斯符文联动（软依赖、零 patch）：装了 HextechRunes 就把这 6 个遗物作为「海克斯符文」登记过去。
         // ⚠️ 必须在模组初始化阶段调用（要赶在共享遗物池首次枚举之前）；对方没装时这里是空操作。
         HextechCompat.Initialize();

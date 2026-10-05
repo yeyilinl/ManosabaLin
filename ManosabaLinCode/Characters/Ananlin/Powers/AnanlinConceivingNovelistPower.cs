@@ -15,6 +15,16 @@ public sealed class AnanlinConceivingNovelistPower : ManosabaPowerTemplate
     public override PowerType Type => PowerType.Buff;
     public override PowerStackType StackType => PowerStackType.Single;
 
+    /// <summary>
+    ///     描述随「来源牌是否升级」切键（升级也是一种达成条件）。两侧通道都切，做法对齐「共犯」/
+    ///     被缚的普罗米修斯。
+    /// </summary>
+    public override LocString Description =>
+        new LocString("powers", FreeCopies ? $"{Id.Entry}.descriptionEnhanced" : $"{Id.Entry}.description");
+
+    protected override string SmartDescriptionLocKey =>
+        FreeCopies ? $"{Id.Entry}.smartDescriptionEnhanced" : $"{Id.Entry}.smartDescription";
+
     protected override IEnumerable<DynamicVar> CanonicalVars =>
     [
         new PowerVar<StrengthPower>(1m),

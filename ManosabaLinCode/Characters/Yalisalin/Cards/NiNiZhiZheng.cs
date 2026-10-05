@@ -5,7 +5,7 @@ namespace ManosabaLin.Characters.Yalisalin.Cards;
 /// <summary>
 /// 忤逆之证（2 费能力・罕见）：
 /// 获得 [忤逆之证]：每次对原罪自惩时 +1 层，每层获得 1 点力量。
-/// 升级：费用 -1。
+/// 升级：费用 -1，并获得保留。
 /// </summary>
 [RegisterCard(typeof(YalisalinCardPool))]
 public sealed class NiNiZhiZheng() : ManosabaCardTemplate(2, CardType.Power, CardRarity.Uncommon, TargetType.Self)
@@ -29,5 +29,6 @@ public sealed class NiNiZhiZheng() : ManosabaCardTemplate(2, CardType.Power, Car
     protected override void OnUpgrade(ComponentContext componentContext)
     {
         EnergyCost.UpgradeBy(-1);
+        AddKeyword(CardKeyword.Retain);
     }
 }

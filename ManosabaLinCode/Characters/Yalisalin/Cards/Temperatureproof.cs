@@ -3,7 +3,8 @@ using ManosabaLin.Characters.Yalisalin.Relics;
 namespace ManosabaLin.Characters.Yalisalin.Cards;
 
 /// <summary>
-///     温差证明：造成伤害，给予 1 格火色并立即引爆最新的 1 格，获得格挡；引爆的是浅橙时格挡翻倍。
+///     温差证明：造成伤害（攻击本身会引爆 1 格火色），再给予 1 格火色，获得格挡；
+///     这次伤害引爆的是浅橙时格挡翻倍。
 /// </summary>
 [RegisterCard(typeof(YalisalinCardPool))]
 public sealed class Temperatureproof()
@@ -22,15 +23,19 @@ public sealed class Temperatureproof()
         var target = cardPlay.Target;
         ArgumentNullException.ThrowIfNull(target);
 
+        var hasHairpin = YalisalinFireColorSystem.TryGetHairpin(Owner, out var hairpin);
+        var consumedBefore = hasHairpin ? hairpin.ConsumptionLog.Count : 0;
+
         await YalisalinFireColorCardHelpers.Attack(choiceContext, cardPlay, this, target, DynamicVars.Damage.BaseValue);
 
-        var consumedOrange = false;
-        if (YalisalinFireColorSystem.TryGetHairpin(Owner, out var hairpin))
-        {
+        // 攻击命中会自己从最新一格引爆 1 格火色；这次伤害引爆的是浅橙时，格挡翻倍。
+        var consumedOrange = hasHairpin
+                             && hairpin.ConsumptionLog
+                                 .Skip(consumedBefore)
+                                 .Any(static color => color == YalisalinFireColor.LightOrange);
+
+        if (hasHairpin)
             await hairpin.GiveFireColor(choiceContext, target, 1, this);
-            var consumed = await hairpin.ConsumeFireColor(choiceContext, target, 1, this);
-            consumedOrange = consumed.Count > 0 && consumed[0] == YalisalinFireColor.LightOrange;
-        }
 
         await CreatureCmd.GainBlock(Owner.Creature, DynamicVars.Block, cardPlay);
         if (consumedOrange)

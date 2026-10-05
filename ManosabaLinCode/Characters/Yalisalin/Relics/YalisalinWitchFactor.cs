@@ -56,6 +56,15 @@ public sealed class YalisalinWitchFactor : ManosabaRelicTemplate
     private async Task EnsureCurseInPlay()
     {
         if (Owner.Creature?.CombatState is not { } combatState) return;
+
+        // ⚠️ 必须在「战斗进行中」才补牌：
+        // 战后选奖励牌（CardReward.OnSelect）等场景也会触发 AfterCardChangedPiles，
+        // 而彼时 CombatManager.IsInProgress == false ⇒ AddGeneratedCardToCombat 会返回空数组，
+        // 其内部 `(...)[0]` 直接抛 ArgumentOutOfRangeException，把奖励选择流程整个打断（点了没反应）。
+        // 引擎文档建议用 IsOverOrEnding（而非 !IsInProgress）判断「战斗已结束/正在结束」。
+        // 开局补牌不受影响：BeforeCombatStart 触发时 IsInProgress 已置 true。
+        if (CombatManager.Instance.IsOverOrEnding) return;
+
         if (!Supplying.Add(Owner)) return;
 
         try

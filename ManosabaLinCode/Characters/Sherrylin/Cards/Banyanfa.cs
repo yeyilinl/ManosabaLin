@@ -27,8 +27,7 @@ public sealed class Banyanfa() : ManosabaCardTemplate(2, CardType.Power, CardRar
     {
         get
         {
-            if (IsUpgraded)
-                yield return CardKeyword.Retain;
+            yield return CardKeyword.Retain;
         }
     }
 

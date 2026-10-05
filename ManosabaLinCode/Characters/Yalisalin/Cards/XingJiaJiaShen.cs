@@ -8,7 +8,7 @@ namespace ManosabaLin.Characters.Yalisalin.Cards;
 /// 升级：作用于每回合前两张。
 /// </summary>
 [RegisterCard(typeof(YalisalinCardPool))]
-public sealed class XingJiaJiaShen() : ManosabaCardTemplate(2, CardType.Power, CardRarity.Uncommon, TargetType.Self)
+public sealed class XingJiaJiaShen() : ManosabaCardTemplate(1, CardType.Power, CardRarity.Uncommon, TargetType.Self)
 {
     protected override IEnumerable<DynamicVar> CanonicalVars =>
     [

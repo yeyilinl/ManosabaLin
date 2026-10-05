@@ -73,15 +73,41 @@ internal static class HangingEmotionOrbs
     }
 
     public static IReadOnlyList<OrbModel> For(Player player)
-        => Hanging.TryGetValue(player, out var list) ? list : [];
+    {
+        if (!Hanging.TryGetValue(player, out var list)) return [];
+        PruneStale(player, list);
+        return list;
+    }
 
     /// <summary>挂着的球数量（UI 每帧判空用 —— 不必为了「没有」而每次分配一个空列表）。</summary>
     public static int Count(Player player)
-        => Hanging.TryGetValue(player, out var list) ? list.Count : 0;
+    {
+        if (!Hanging.TryGetValue(player, out var list)) return 0;
+        PruneStale(player, list);
+        return list.Count;
+    }
 
     /// <summary>雀跃的循环接续用：该玩家有没有「挂着的」某类情绪球。</summary>
     public static bool HasHanging(Player? player, Func<OrbModel, bool> predicate)
-        => player is not null && Hanging.TryGetValue(player, out var list) && list.Any(predicate);
+    {
+        if (player is null || !Hanging.TryGetValue(player, out var list)) return false;
+        PruneStale(player, list);
+        return list.Any(predicate);
+    }
+
+    /// <summary>
+    ///     剔除「已经不在战斗状态里」的球（<c>HasBeenRemovedFromState</c>）—— 引擎若在别的路径上把它移除，
+    ///     登记表里的残留条目会让显示层继续把它画出来。顺手清掉变空的条目，避免 <see cref="Player" /> 强引用泄漏。
+    ///     <para>⚠️ 只在**读**路径上顺手做，不能反过来指望它替代战斗结束的 <see cref="ReleaseAll" />。</para>
+    /// </summary>
+    private static bool PruneStale(Player player, List<OrbModel> list)
+    {
+        var removed = list.RemoveAll(static orb => orb.HasBeenRemovedFromState);
+        if (removed > 0 && list.Count == 0)
+            Hanging.Remove(player);
+
+        return removed > 0;
+    }
 
     /// <summary>
     ///     把一个持续型情绪球从球位「摘下来」挂到血条下方。
@@ -115,5 +141,37 @@ internal static class HangingEmotionOrbs
             orb.RemoveInternal();
 
         Changed?.Invoke(player);
+    }
+
+    /// <summary>
+    ///     释放**所有**玩家挂着的球（**战斗结束**时调用）。
+    ///     <para>
+    ///         ⚠️ 之前只有「下个玩家回合开始」的 <see cref="Release(Player)" />；「球还挂着战斗就结束 /
+    ///         持有者阵亡」这条路径没有任何收口 ⇒ <see cref="Hanging" />（<c>static</c> 且键是
+    ///         <see cref="Player" /> 强引用）会一直留着：轻则 <c>EmotionHangDisplay</c> 画出**幻影挂位**，
+    ///         重则跨 run 泄漏内存。战斗结束是唯一可靠的收口点。
+    ///     </para>
+    ///     <para>
+    ///         幂等：多人下每端、每个持有遗物的玩家各调一次也无副作用
+    ///         （已从状态移除的球不再重复 <c>RemoveInternal</c>，空表直接返回）。
+    ///     </para>
+    /// </summary>
+    public static void ReleaseAll()
+    {
+        if (Hanging.Count == 0) return;
+
+        var snapshot = Hanging.ToArray();
+        Hanging.Clear();
+
+        foreach (var (player, orbs) in snapshot)
+        {
+            foreach (var orb in orbs)
+            {
+                if (!orb.HasBeenRemovedFromState)
+                    orb.RemoveInternal();
+            }
+
+            Changed?.Invoke(player);
+        }
     }
 }

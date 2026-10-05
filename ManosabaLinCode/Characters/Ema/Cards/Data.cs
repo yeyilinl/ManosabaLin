@@ -13,7 +13,7 @@ using STS2RitsuLib.Keywords;
 
 namespace ManosabaLin.Characters.Ema.Cards;
 
-/// <summary>便签条 - 1费技能, 疑问关键字, 抽4张, 手牌里的疑问附魔牌可以免费打出一次</summary>
+/// <summary>便签条 - 1费技能, 疑问关键字, 抽2张（升级后抽4张）, 手牌里的疑问附魔牌可以免费打出一次</summary>
 [RegisterCard(typeof(EmalinCardPool))]
 public sealed class Data : ManosabaCardTemplate
 {
@@ -22,7 +22,7 @@ public sealed class Data : ManosabaCardTemplate
     public override IEnumerable<CardKeyword> CanonicalKeywords =>
         new[] { EmalinKeywordRules.DoubtCardKeyword };
 
-    protected override IEnumerable<DynamicVar> CanonicalVars => [new CardsVar(4)];
+    protected override IEnumerable<DynamicVar> CanonicalVars => [new CardsVar(2)];
 
     protected override async Task OnPlay(PlayerChoiceContext choiceContext, CardPlay cardPlay, ComponentContext componentContext)
     {
@@ -40,6 +40,7 @@ public sealed class Data : ManosabaCardTemplate
 
     protected override void OnUpgrade(ComponentContext componentContext)
     {
-        
+        // 2 → 4。卡面描述走 `{Cards:diff()}` 动态变量，升级后自动显示「抽4张」。
+        DynamicVars.Cards.UpgradeValueBy(2m);
     }
 }

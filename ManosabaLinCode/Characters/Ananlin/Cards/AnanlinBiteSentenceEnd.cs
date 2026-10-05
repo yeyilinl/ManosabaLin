@@ -10,14 +10,12 @@ public sealed class AnanlinBiteSentenceEnd()
     protected override IEnumerable<DynamicVar> CanonicalVars =>
     [
         new DamageVar(7m, ValueProp.Move),
-        new DamageVar("PeaceBonus", 2m, ValueProp.Move),
-        new PowerVar<SilentPower>("Silence", 1m)
+        new DamageVar("PeaceBonus", 2m, ValueProp.Move)
     ];
 
     protected override IEnumerable<IHoverTip> AdditionalHoverTips =>
     [
-        HoverTipFactory.FromPower<AnanlinPeaceOfMindPower>(),
-        HoverTipFactory.FromPower<SilentPower>()
+        HoverTipFactory.FromPower<AnanlinPeaceOfMindPower>()
     ];
 
     protected override async Task OnPlay(
@@ -38,9 +36,6 @@ public sealed class AnanlinBiteSentenceEnd()
             .Targeting(target)
             .WithHitFx("vfx/vfx_attack_slash")
             .Execute(choiceContext);
-
-        if (peace > 0)
-            await this.AddSilence(choiceContext, DynamicVars["Silence"].IntValue);
     }
 
     protected override void OnUpgrade(ComponentContext componentContext)

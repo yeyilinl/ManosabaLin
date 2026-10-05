@@ -48,27 +48,25 @@ public sealed class AnanlinWeavingLiesSleepingPrincess()
         await CreatureCmd.TriggerAnim(Owner.Creature, "Cast", Owner.Character.CastAnimDelay);
 
         var sketchbook = this.Sketchbook();
-        var lieCount = Math.Max(0, CurrentSilence() / DynamicVars[SilencePerLieKey].IntValue);
+
+        // 卡面：「每失去{SilencePerLie}层【缄默】，获得1层【原罪】」
+        // ⇒ 按档位真正失去【缄默】（失去本卡记载资源），再把失去的层数换成等量【原罪】。
+        var perLie = DynamicVars[SilencePerLieKey].IntValue;
+        var lieCount = Math.Max(0, CurrentSilence() / perLie);
         if (lieCount > 0)
+        {
+            if (Owner.Creature.GetPower<SilentPower>() is { } silence)
+                await PowerCmd.ModifyAmount(choiceContext, silence, -lieCount * perLie, Owner.Creature, this, false);
+
             await PowerCmd.Apply<AnanlinLiePower>(choiceContext, Owner.Creature, lieCount, Owner.Creature, this);
+        }
 
         var totalLies = CurrentLies();
+
+        // 卡面：「若成功失去{PeaceThreshold}层【安心】，将所有敌人当前意图改写为:失去1点生命，次数等于【谎言】」
         var lostPeace = await this.LosePeaceOfMind(choiceContext, int.MaxValue);
-        var attackIntentEnemies = CombatState.Enemies
-            .Where(static enemy => enemy.IsAlive)
-            .Where(enemy => HasAttackIntent(enemy.Monster?.NextMove))
-            .ToArray();
-
-        foreach (var enemy in attackIntentEnemies)
-            sketchbook?.TryForgetRecordedAttack(enemy);
-
-        if (totalLies > 0)
-        {
-            if (lostPeace >= DynamicVars[PeaceThresholdKey].IntValue)
-                RewriteEnemiesToLoseLife(totalLies);
-            else if (lostPeace > 0)
-                await ApplyTemporaryStrengthDown(choiceContext, lostPeace * totalLies);
-        }
+        if (totalLies > 0 && lostPeace >= DynamicVars[PeaceThresholdKey].IntValue)
+            RewriteEnemiesToLoseLife(totalLies);
 
         await ConsumeWitchificationAndGenerateRetainCards(choiceContext, sketchbook);
     }
@@ -99,14 +97,6 @@ public sealed class AnanlinWeavingLiesSleepingPrincess()
         }
 
         AnanlinSilenceIntentManager.RecordIntentRewrites(CombatState, rewritten);
-    }
-
-    private async Task ApplyTemporaryStrengthDown(PlayerChoiceContext choiceContext, int amount)
-    {
-        if (amount <= 0) return;
-
-        foreach (var enemy in CombatState.Enemies.Where(static enemy => enemy.IsAlive))
-            await PowerCmd.Apply<TempStrengthDown>(choiceContext, enemy, amount, Owner.Creature, this);
     }
 
     private MoveState CreateSelfLossMove(MonsterModel monster, MoveState followUpSource, int hitCount)
@@ -182,11 +172,6 @@ public sealed class AnanlinWeavingLiesSleepingPrincess()
         }
 
         return null;
-    }
-
-    private static bool HasAttackIntent(MoveState? move)
-    {
-        return move?.Intents.Any(static intent => intent is AttackIntent) == true;
     }
 
     private static bool IsCurrentlyPlayable(CardModel card, ICombatState combatState)

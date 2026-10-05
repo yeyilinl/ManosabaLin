@@ -11,6 +11,7 @@ using MegaCrit.Sts2.Core.GameActions.Multiplayer;
 using MegaCrit.Sts2.Core.HoverTips;
 using MegaCrit.Sts2.Core.Localization.DynamicVars;
 using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.ValueProps;
 using STS2RitsuLib.Interop.AutoRegistration;
 using System.Collections.Generic;
 using System.Linq;
@@ -21,6 +22,8 @@ namespace ManosabaLin.Characters.Ema.Cards;
 public sealed class ChainedTrust : ManosabaCardTemplate
 {
     public ChainedTrust() : base(1, CardType.Attack, CardRarity.Uncommon, TargetType.Self) { }
+
+    public override bool GainsBlock => true;
 
     protected override IEnumerable<IHoverTip> AdditionalHoverTips
     {
@@ -47,16 +50,9 @@ public sealed class ChainedTrust : ManosabaCardTemplate
         await PowerCmd.Apply<NyxmPower>(
             choiceContext, creature, DynamicVars["NyxmStacks"].BaseValue, creature, this, false);
 
-        var discardPile = PileType.Discard.GetPile(owner);
-        if (discardPile.Cards.Count > 0)
-        {
-            var prefs = new CardSelectorPrefs(SelectionScreenPrompt, 1, 1);
-            var selected = await CardSelectCmd.FromSimpleGrid(
-                choiceContext, discardPile.Cards, owner, prefs);
-            var retrieved = selected.FirstOrDefault();
-            if (retrieved != null)
-                await CardPileCmd.Add(retrieved, PileType.Hand);
-        }
+        // 卡面：「获得当前【疏远】等量的格挡」——本卡自带的「疏远」+1 已经结算，取此刻的数值。
+        if (bond != null && bond.Estrangement > 0)
+            await CreatureCmd.GainBlock(creature, bond.Estrangement, ValueProp.Move, cardPlay);
 
         if (bond != null && bond.Estrangement > bond.Affinity)
         {

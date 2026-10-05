@@ -40,6 +40,15 @@
 ### ⚪ 不可测：YalisalinMlym（罪债抵押多人版）
 - `MultiplayerConstraint.MultiplayerOnly`，单人测试框架无法打出。需多人环境手动验证。
 
+> ⚠️ **2026-09-30 复核更正（问题 A / 问题 B 的结论已过期）**
+> 上面 A/B 两条是按**当时的代码**写的。之后 `Temperatureproof` / `Pocketmatchbox` 已改为读消耗记录（`ConsumptionLog` 差量），
+> **不再引用 `SelectionScreenPrompt`** ⇒ 「打出必崩」不再成立（因此这两张至今没有、也不再需要该键）；
+> `Glasshug`（`GLASSHUG`）/ `Beforeforgiven`（实际键名 `BEFOREFORGIVEN`）**5 语言都已有键**。
+> 全库穷尽复核（113 处「选择提示键」引用）后**真实且仍存在的崩溃点只有 2 处**，均已于 2026-09-30 23:59 修复：
+> ① 五语 `relics.json` 的 `MANOSABA_LIN_RELIC_WITHEMA.SelectionScreenPrompt` **大小写写错**（应为小写 s）⇒ `Withema` 在「疏远==7 且打出疏远牌」时崩；
+> ② `kor/cards.json` 缺 `MANOSABA_LIN_CARD_SAME_PLACE_TRUTH.selectionScreenPrompt` ⇒ 韩语下「旧识疑影」崩。
+> 判据：`LocString.Exists()` = `LocTable.HasEntry(精确键名)`，**无语言回退、无大小写容错**；余火选择界面用的是**共享键** `ManosabaLin.YalisalinFireComponent.selectionScreenPrompt`，故余火卡不需要各自的键。
+
 ### ✅ 已确认正确的行为（此前轮次核实）
 - ContrastWound 手牌无原罪时弹窗询问获得原罪+宽恕+伤害减半——设计正确（本地化一致）。
 - ZuiZhaiDiYa 无原罪时直接返回只给格挡——正确。

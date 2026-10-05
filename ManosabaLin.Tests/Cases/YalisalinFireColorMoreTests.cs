@@ -87,7 +87,7 @@ public sealed class YalisalinFireColorMoreTests : CombatTestSuite
         Assert.Equal(YalisalinFireColor.Red, Hairpin.ConsumptionLog[logStart]);
     }
 
-    /// <summary>连续消耗两格浅橙：每格 4 格挡，第二格凑成连续。</summary>
+    /// <summary>连续消耗两格浅橙：第二格凑成连续。</summary>
     [Fact]
     public async Task Two_orange_in_a_row_trigger_continuous()
     {
@@ -96,20 +96,18 @@ public sealed class YalisalinFireColorMoreTests : CombatTestSuite
         Assert.Equal(2, Hairpin.GetFireColorCount(enemy));
 
         var continuousBefore = Hairpin.ContinuousTriggersThisCombat;
-        var blockBefore = Player.Creature.Block;
 
-        // 升级后的临界擦边：消耗 1 格并无条件再给 1 格，所以用未升级版，靠「不满格」跳过回填。
-        await PlayWithEnergy(await AddToHand<Grazingcritical>(), enemy);
-        await PlayWithEnergy(await AddToHand<Grazingcritical>(), enemy);
+        // 「放学后的试烧」：攻击本身引爆 1 格，再额外消耗 1 格 —— 两格浅橙刚好凑成一次连续。
+        await PlayWithEnergy(await AddToHand<Afterschooltestburn>(), enemy);
 
         Assert.Equal(0, Hairpin.GetFireColorCount(enemy));
-        Assert.Equal(blockBefore + 8, Player.Creature.Block);
         Assert.Equal(continuousBefore + 1, Hairpin.ContinuousTriggersThisCombat);
     }
 
     /// <summary>
-    /// 超出格数：满格时再给予 6 格，按第 1..6 格的颜色一次性补结算，
-    /// 三对同色各触发一次连续（赤红连续给 1 力量）。
+    /// 溢出：满格时再给予 6 格，按第 1..6 格的颜色补结算，三对同色各触发一次连续（赤红连续给 1 力量）。
+    /// 注：这是「同一次给予」内的结算（溢出色序首轮恰好是 1..6）；跨多次给予会接着往下数，
+    /// 见 <see cref="Stoke_keeps_counting_across_separate_gives" />。
     /// </summary>
     [Fact]
     public async Task Tomorrowburn_overflow_resolves_slot_colors_once()
@@ -132,6 +130,38 @@ public sealed class YalisalinFireColorMoreTests : CombatTestSuite
             Hairpin.ConsumptionLog.Skip(logStart).ToArray());
         Assert.Equal(continuousBefore + 3, Hairpin.ContinuousTriggersThisCombat);
         Assert.Equal(1, CardTestAssertions.PowerAmount<StrengthPower>(Player.Creature));
+    }
+
+    /// <summary>
+    /// 「予燎」跨多次给予持续累计（2026-10-01 定稿）：
+    /// 溢出色序按 <c>槽位 = 累计溢出格数 % 6 + 1</c> 一直往后数，溢出不减格（量表恒满）。
+    /// 这里用「窗上的车票」把每次给予都撑到 7 格，于是第一次溢出 1 格、第二次接着溢出 7 格；
+    /// 若按旧实现（每次调用都重置链与序号），第二次会重新从「浅橙,浅橙,亮黄…」开始 —— 与断言不符。
+    /// </summary>
+    [Fact]
+    public async Task Stoke_keeps_counting_across_separate_gives()
+    {
+        var enemy = EnemyAt(0);
+        await PlayWithEnergy(await AddToHand<Ticketonwindow>()); // 每次给予额外 +1 格
+
+        await PlayWithEnergy(await AddToHand<Tomorrowburn>(), enemy); // 总量 7 ⇒ 填 6、溢出 1（累计第 1 格）
+        Assert.Equal(6, Hairpin.GetFireColorCount(enemy));
+
+        var logStart = Hairpin.ConsumptionLog.Count;
+        await PlayWithEnergy(await AddToHand<Tomorrowburn>(), enemy); // 总量 7 全溢出 ⇒ 接着第 2 格往下数
+
+        Assert.Equal(6, Hairpin.GetFireColorCount(enemy)); // 溢出不减格
+        Assert.Equal(
+            [
+                YalisalinFireColor.LightOrange,  // 累计第 2 格
+                YalisalinFireColor.BrightYellow, // 第 3 格
+                YalisalinFireColor.BrightYellow, // 第 4 格
+                YalisalinFireColor.Red,          // 第 5 格
+                YalisalinFireColor.Red,          // 第 6 格
+                YalisalinFireColor.LightOrange,  // 第 7 格 ⇒ 已过 6 格，回到浅橙
+                YalisalinFireColor.LightOrange   // 第 8 格
+            ],
+            Hairpin.ConsumptionLog.Skip(logStart).ToArray());
     }
 
     /// <summary>反向验算：消耗本回合给予的最早一格（浅橙），消耗效果翻倍 → 5 格挡 + 4×2。</summary>
@@ -251,7 +281,10 @@ public sealed class YalisalinFireColorMoreTests : CombatTestSuite
 
         var hpBefore = enemy.CurrentHp;
         await PlayWithEnergy(await AddToHand<Pocketmatchbox>(), enemy); // 第 3 格亮黄 ≠ 第 2 格浅橙
-        Assert.Equal(3, Hairpin.GetFireColorCount(enemy));
+        // ⚠️ 本卡已从「技能」改成「攻击卡」⇒ 它造成的 8 点伤害会按火色 v2 规则**自动消耗最新一格**
+        //    （发夹 `AfterDamageGiven` 的门槛就是 `cardSource.Type == CardType.Attack`）：
+        //    给 1 格（2→3）后打伤害再消耗 1 格（3→2），净剩 2 格。
+        Assert.Equal(2, Hairpin.GetFireColorCount(enemy));
         Assert.Equal(hpBefore - 8, enemy.CurrentHp);
     }
 
@@ -299,6 +332,12 @@ public sealed class YalisalinFireColorMoreTests : CombatTestSuite
         AssertDescriptionRenders<Thirteenthlistener>();
         AssertDescriptionRenders<BoundPrometheus>();
         AssertDescriptionRenders<Burnedapology>();
+        AssertDescriptionRenders<Fifthselfproof>();
+        AssertDescriptionRenders<CombustionShared>();
+        AssertDescriptionRenders<StokeForYou>();
+        AssertDescriptionRenders<TorchPassing>();
+        AssertDescriptionRenders<SharedGuilt>();
+        AssertDescriptionRenders<EmberDividend>();
 
         await PlayWithEnergy(await AddToHand<YalisalinDefend>());
     }
@@ -319,16 +358,21 @@ public sealed class YalisalinFireColorMoreTests : CombatTestSuite
         }
     }
 
+    /// <summary>温差证明：伤害先引爆（攻击自带），再给予 1 格，然后结算格挡；引爆到浅橙则格挡翻倍。</summary>
     [Fact]
-    public async Task Temperatureproof_gives_then_detonates_orange_for_double_block()
+    public async Task Temperatureproof_doubles_block_when_this_damage_burns_light_orange()
     {
         var enemy = EnemyAt(0);
+        // 先垫 2 格浅橙：本次伤害会引爆第 2 格（浅橙）→ 格挡翻倍。
+        await PlayWithEnergy(await AddToHand<Unseenkindling>(), enemy);
         var hpBefore = enemy.CurrentHp;
+
         await PlayWithEnergy(await AddToHand<Temperatureproof>(), enemy);
 
         Assert.Equal(hpBefore - 8, enemy.CurrentHp);
-        Assert.Equal(0, Hairpin.GetFireColorCount(enemy));
-        // 浅橙消耗效果 4 + 本牌 5 × 2（引爆的是浅橙）
+        // 引爆掉 1 格后本牌再给予 1 格 → 净剩 2 格。
+        Assert.Equal(2, Hairpin.GetFireColorCount(enemy));
+        // 浅橙消耗效果 4 + 本牌 5 × 2（此次伤害引爆的是浅橙）
         Assert.Equal(14, Player.Creature.Block);
     }
 }

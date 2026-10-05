@@ -17,7 +17,7 @@ using MegaCrit.Sts2.Core.Nodes.Screens.ScreenContext;
 namespace ManosabaLin.Characters.Sherrylin.Orbs;
 
 /// <summary>
-///     持续型情绪球的「挂在血条下方」显示区（联动遗物 2）。
+///     持续型情绪球的「挂在角色头顶上方」显示区（联动遗物 2）。
 ///     <para>
 ///         ⚠️ <b>这是纯显示层</b>：效果一个字都没搬过来 —— 真正的效果由
 ///         <see cref="HangingEmotionOrbs" /> 里那些**球对象自己**继续跑（引擎的
@@ -31,10 +31,9 @@ namespace ManosabaLin.Characters.Sherrylin.Orbs;
 /// </summary>
 public partial class EmotionHangDisplay : Control
 {
-    private const float CardScale = 0.5f;
-    private const float CardGap = 8f;
-    private const float BarGap = 10f;
-    private const float FallbackAnchorHeight = 24f;
+    private const float CardScale = 0.125f;
+    private const float CardGap = 4f;
+    private const float HeadGap = 6f;
 
     private static readonly Vector2 CardSize = NCard.defaultSize * CardScale;
 
@@ -42,13 +41,12 @@ public partial class EmotionHangDisplay : Control
 
     private Player? _owner;
     private Creature? _creature;
-    private Control? _anchor;
     private string _signature = string.Empty;
 
     public override void _Ready()
     {
         MouseFilter = MouseFilterEnum.Ignore;
-        ZIndex = 20;
+        ZIndex = 0;
         Visible = false;
 
         HangingEmotionOrbs.Changed += OnChanged;
@@ -68,7 +66,6 @@ public partial class EmotionHangDisplay : Control
     {
         _owner = owner;
         _creature = creature;
-        _anchor = null;
         Rebuild(force: true);
     }
 
@@ -82,6 +79,9 @@ public partial class EmotionHangDisplay : Control
 
         RefreshPosition();
         Rebuild();
+        // Rebuild 在「签名没变」时会提前 return、不会把 Visible 翻回 true —— 这里兜底恢复可见，
+        // 避免切到牌组等覆盖层再切回来时挂卡一直不显示。
+        Visible = true;
     }
 
     private void OnChanged(Player player)
@@ -91,24 +91,30 @@ public partial class EmotionHangDisplay : Control
         Rebuild(force: true);
     }
 
-    /// <summary>贴在血条（<c>NHealthBar.HpBarContainer</c>）正下方。</summary>
+    /// <summary>挂在角色头顶（血条 / 能力图标区）上方，水平居中。</summary>
     private void RefreshPosition()
     {
         var creatureNode = _creature?.GetCreatureNode();
         if (creatureNode is null) return;
 
-        if (_anchor is null || !IsInstanceValid(_anchor))
+        // 首选血条 / 能力区（NCreature._stateDisplay = "%HealthBar"）的顶边，挂在它上方 ⇒ 既在角色头顶上方、又不遮血条与能力图标；
+        // 拿不到该节点时降级到碰撞盒顶部（GetTopOfHitbox）。
+        float centerX, topY;
+        if (creatureNode.GetNodeOrNull<NCreatureStateDisplay>("%HealthBar") is { } stateDisplay)
         {
-            // NCreature._stateDisplay = GetNode<NCreatureStateDisplay>("%HealthBar")
-            // NCreatureStateDisplay._healthBar = GetNode<NHealthBar>("%HealthBar")（各自场景内的唯一名）
-            var stateDisplay = creatureNode.GetNodeOrNull<NCreatureStateDisplay>("%HealthBar");
-            _anchor = stateDisplay?.GetNodeOrNull<NHealthBar>("%HealthBar")?.HpBarContainer;
-            if (_anchor is null) return;
+            centerX = stateDisplay.GlobalPosition.X + stateDisplay.Size.X * 0.5f;
+            topY = stateDisplay.GlobalPosition.Y;
+        }
+        else
+        {
+            var top = creatureNode.GetTopOfHitbox();
+            centerX = top.X;
+            topY = top.Y;
         }
 
         GlobalPosition = new Vector2(
-            _anchor.GlobalPosition.X,
-            _anchor.GlobalPosition.Y + Math.Max(_anchor.Size.Y, FallbackAnchorHeight) + BarGap);
+            centerX - Size.X * 0.5f,
+            topY - Size.Y - HeadGap);
     }
 
     private bool CanShow()
@@ -116,9 +122,11 @@ public partial class EmotionHangDisplay : Control
         if (_owner is null || _creature is null || !_creature.IsAlive) return false;
         if (HangingEmotionOrbs.Count(_owner) == 0) return false;
 
-        return IsCombatScreenActive()
-               && _creature.GetCreatureNode() is { } creatureNode
-               && creatureNode.IsVisibleInTree();
+        // 只在战斗主界面显示：开牌组/暂停/地图等覆盖界面时隐藏（学艾玛"耳朵"，不浮在别的界面上）。
+        if (!IsCombatScreenActive()) return false;
+
+        // 生物节点已不在场景树里（战斗结束、切场景）则不显示。
+        return _creature.GetCreatureNode() is { } creatureNode && creatureNode.IsVisibleInTree();
     }
 
     private static bool IsCombatScreenActive()

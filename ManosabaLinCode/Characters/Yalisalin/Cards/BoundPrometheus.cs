@@ -16,10 +16,7 @@ public sealed class BoundPrometheus()
         new DynamicVar("BurnDamage", BoundPrometheusPower.DamagePerConsume)
     ];
 
-    protected override IEnumerable<IHoverTip> AdditionalHoverTips
-    {
-        get { yield return HoverTipFactory.FromPower<BoundPrometheusPower>(); }
-    }
+  
 
     protected override async Task OnPlay(
         PlayerChoiceContext choiceContext,

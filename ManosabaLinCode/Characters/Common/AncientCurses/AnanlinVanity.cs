@@ -7,7 +7,7 @@ namespace ManosabaLin.Characters.Common.AncientCurses;
 [RegisterCard(typeof(LinCardPool))]
 public sealed class AnanlinVanity : LinAncientCurseCard
 {
-    public AnanlinVanity() : base(1) { }
+    public AnanlinVanity() : base(0) { }
 
     protected override IEnumerable<DynamicVar> CanonicalVars =>
     [
